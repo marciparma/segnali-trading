@@ -10,9 +10,8 @@
     "attiva": true,
     "short": true,
     "simboli": [
-      {"yahoo": "^FTSE",  "nome": "UK100 (FTSE 100)", "unita": "lotti",  "valore_punto": 1.0, "step": 0.01, "minimo": 0.01, "spread": 1.0},
-      {"yahoo": "BP.L",   "nome": "BP",               "unita": "azioni", "valore_punto": 1.0, "step": 1,    "minimo": 1,    "spread": 0.0},
-      {"yahoo": "SHEL.L", "nome": "Shell",            "unita": "azioni", "valore_punto": 1.0, "step": 1,    "minimo": 1,    "spread": 0.0}
+      {"yahoo": "^FTSE", "nome": "UK100.s (FTSE 100)", "unita": "lotti", "valore_punto": 1.0,   "step": 0.01, "minimo": 0.01, "spread": 1.0},
+      {"yahoo": "BP.L",  "nome": "BP",                 "unita": "lotti", "valore_punto": 100.0, "step": 0.01, "minimo": 0.01, "spread": 0.0}
     ]
   },
 
@@ -20,10 +19,10 @@
     "attiva": true,
     "short": false,
     "simboli": [
-      {"yahoo": "TSLA", "nome": "Tesla",  "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
-      {"yahoo": "NVDA", "nome": "Nvidia", "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
-      {"yahoo": "AAPL", "nome": "Apple",  "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
-      {"yahoo": "AMD",  "nome": "AMD",    "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0}
+      {"yahoo": "TSLA", "nome": "Tesla (TSLA)",    "unita": "lotti", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "NVDA", "nome": "Nvidia (NVIDIA)", "unita": "lotti", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "AAPL", "nome": "Apple (AAPL)",    "unita": "lotti", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "AMD",  "nome": "AMD",             "unita": "lotti", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0}
     ]
   }
 }

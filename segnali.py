@@ -332,6 +332,14 @@ def leggi_messaggi(conto, adesso, dry, file_finto=None):
         testo = msg.get("text")
         if testo:
             manda(interpreta(testo, conto, adesso), dry)
+    if risultati and not file_finto:
+        # conferma a Telegram che li ho letti: così non li rimanda mai più,
+        # anche se il file conto.json non venisse salvato
+        try:
+            urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getUpdates?timeout=0"
+                                   f"&offset={conto['offset'] + 1}", timeout=20).read()
+        except Exception as e:
+            print(f"conferma a Telegram non riuscita: {e}")
 
 
 # ---------- una seduta ----------

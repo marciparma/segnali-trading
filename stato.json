@@ -4,13 +4,41 @@
   "londra:^FTSE:range",
   "londra:BP.L:range",
   "londra:BP.L:segnale",
-  "londra:fine"
+  "londra:fine",
+  "usa:TSLA:range",
+  "usa:TSLA:segnale",
+  "usa:NVDA:range",
+  "usa:NVDA:segnale",
+  "usa:AAPL:range",
+  "usa:AAPL:segnale",
+  "usa:AMD:range",
+  "usa:AMD:segnale"
  ],
- "rischio_eur": 9.977530859637387,
+ "rischio_eur": 47.15238268863023,
  "segnali": [
   {
    "sessione": "londra",
    "nome": "BP",
+   "lato": "long"
+  },
+  {
+   "sessione": "usa",
+   "nome": "Tesla (TSLA)",
+   "lato": "long"
+  },
+  {
+   "sessione": "usa",
+   "nome": "Nvidia (NVIDIA)",
+   "lato": "long"
+  },
+  {
+   "sessione": "usa",
+   "nome": "Apple (AAPL)",
+   "lato": "long"
+  },
+  {
+   "sessione": "usa",
+   "nome": "AMD",
    "lato": "long"
   }
  ]

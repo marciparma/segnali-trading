@@ -2,8 +2,13 @@ name: Segnali trading
 
 on:
   schedule:
+    # Orari in UTC, lunedì-venerdì, ogni 5 minuti.
+    # 07-10 UTC copre l'apertura di Londra (9:00 italiane, anche con l'ora legale).
+    # 13-21 UTC copre la seduta USA (15:30-22:00 italiane) e la chiusura di Londra.
     - cron: "*/5 7-10 * * 1-5"
     - cron: "*/5 13-21 * * 1-5"
+    # Una volta all'ora, tutti i giorni: legge i tuoi messaggi (+17,80 / -9,10 / saldo)
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       test:
@@ -33,9 +38,9 @@ jobs:
           TEST: ${{ github.event.inputs.test }}
         run: python3 segnali.py
 
-      - name: Salva quali avvisi sono già stati mandati oggi
+      - name: Salva avvisi mandati e saldo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
-          git add stato.json 2>/dev/null || true
+          git add stato.json conto.json 2>/dev/null || true
           git diff --cached --quiet || (git commit -m "stato segnali" && git push)

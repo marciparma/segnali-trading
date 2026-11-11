@@ -1,0 +1,41 @@
+name: Segnali trading
+
+on:
+  schedule:
+    - cron: "*/5 7-10 * * 1-5"
+    - cron: "*/5 13-21 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Manda solo un messaggio di prova su Telegram"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: segnali
+  cancel-in-progress: false
+
+jobs:
+  controlla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Controlla i grafici e manda i segnali
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SALDO_EUR: ${{ secrets.SALDO_EUR }}
+          TEST: ${{ github.event.inputs.test }}
+        run: python3 segnali.py
+
+      - name: Salva quali avvisi sono già stati mandati oggi
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add stato.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "stato segnali" && git push)

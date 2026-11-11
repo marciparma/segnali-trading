@@ -218,6 +218,122 @@ def manda(testo, dry):
         r.read()
 
 
+# ---------- conto: saldo aggiornato dai tuoi messaggi Telegram ----------
+
+FILE_CONTO = os.path.join(QUI, "conto.json")
+
+
+def carica_conto(saldo_iniziale):
+    try:
+        with open(FILE_CONTO) as f:
+            c = json.load(f)
+    except (OSError, ValueError):
+        c = {}
+    c.setdefault("saldo", saldo_iniziale)
+    c.setdefault("offset", 0)
+    c.setdefault("movimenti", [])
+    return c
+
+
+def salva_conto(c):
+    with open(FILE_CONTO, "w") as f:
+        json.dump(c, f, indent=1, ensure_ascii=False)
+
+
+def leggi_numero(testo):
+    """Trova un numero come +17,80 / -9.1 / 1002,50 nel testo. Ritorna (valore, aveva_segno)."""
+    import re
+    m = re.search(r"([+\-−]?)\s*(\d+(?:[.,]\d+)?)", testo)
+    if not m:
+        return None, False
+    segno = m.group(1).replace("−", "-")
+    v = float(m.group(2).replace(",", "."))
+    return (-v if segno == "-" else v), bool(segno)
+
+
+def interpreta(testo, conto, adesso):
+    """Capisce un tuo messaggio e aggiorna il conto. Ritorna la risposta da mandarti."""
+    t = testo.strip()
+    basso = t.lower()
+    oggi = dt.datetime.fromtimestamp(adesso, IT).strftime("%d/%m %H:%M")
+    if basso in ("/start", "start", "aiuto", "/aiuto", "help", "/help"):
+        return ("Comandi:\n"
+                "• +17,80  → guadagno di una posizione (puoi aggiungere il nome: BP +17,80)\n"
+                "• -9,10   → perdita di una posizione\n"
+                "• saldo   → ti dico saldo attuale e ultimi movimenti\n"
+                "• saldo 1002,50 → imposto il saldo esatto (copialo da MT5)\n"
+                "• annulla → tolgo l'ultimo movimento\n"
+                "Rispondo al controllo successivo (di solito entro 5 minuti nei giorni di borsa, "
+                "altrimenti entro un'ora).")
+    if basso.startswith("annulla"):
+        if not conto["movimenti"]:
+            return "Non c'è nessun movimento da annullare."
+        ultimo = conto["movimenti"].pop()
+        conto["saldo"] = round(conto["saldo"] - ultimo["importo"], 2)
+        return f"Annullato: {ultimo['nota']} ({num(ultimo['importo'])} €). Saldo: {num(conto['saldo'])} €."
+    if basso.startswith("saldo") or basso.startswith("/saldo"):
+        v, _ = leggi_numero(t[5:])
+        if v is not None:
+            vecchio = conto["saldo"]
+            conto["saldo"] = round(abs(v), 2)
+            conto["movimenti"].append(dict(data=oggi, importo=round(conto["saldo"] - vecchio, 2),
+                                           nota="saldo impostato a mano"))
+            return (f"Saldo impostato: {num(conto['saldo'])} €. "
+                    f"Da ora rischio per trade ≈ {num(conto['saldo'] * 0.01)} €.")
+        righe = [f"💶 Saldo: {num(conto['saldo'])} € · rischio per trade ≈ {num(conto['saldo'] * 0.01)} €"]
+        ultimi = [m for m in conto["movimenti"] if m["nota"] != "saldo impostato a mano"][-5:]
+        if ultimi:
+            righe.append("Ultimi movimenti:")
+            righe += [f"• {m['data']}  {'+' if m['importo'] >= 0 else ''}{num(m['importo'])} €  {m['nota']}"
+                      for m in ultimi]
+        return "\n".join(righe)
+    v, segno = leggi_numero(t)
+    if v is None:
+        return "Non ho capito. Scrivi per esempio +17,80 o -9,10, oppure 'aiuto'."
+    if not segno:
+        return (f"Hai scritto {num(v)} senza segno: è un guadagno o una perdita? "
+                f"Riscrivilo come +{num(v)} oppure -{num(v)}.")
+    if abs(v) > conto["saldo"] * 0.5:
+        return (f"{num(v)} € è più della metà del conto: per sicurezza non lo registro. "
+                f"Se è giusto, imposta il saldo esatto con: saldo 1234,56")
+    import re
+    nome = re.sub(r"[+\-−]?\s*\d+(?:[.,]\d+)?\s*€?", "", t).strip(" :€") or "posizione"
+    conto["saldo"] = round(conto["saldo"] + v, 2)
+    conto["movimenti"].append(dict(data=oggi, importo=round(v, 2), nota=nome))
+    conto["movimenti"] = conto["movimenti"][-200:]
+    icona = "✅" if v >= 0 else "🔻"
+    return (f"{icona} Registrato {nome}: {'+' if v >= 0 else ''}{num(v)} €.\n"
+            f"Nuovo saldo: {num(conto['saldo'])} € · rischio per trade ≈ {num(conto['saldo'] * 0.01)} €.")
+
+
+def leggi_messaggi(conto, adesso, dry, file_finto=None):
+    """Prende i messaggi nuovi che mi hai scritto su Telegram e risponde a ciascuno."""
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if file_finto:
+        with open(file_finto) as f:
+            risultati = json.load(f)
+    else:
+        token = os.environ.get("TELEGRAM_TOKEN")
+        if not token:
+            return
+        url = (f"https://api.telegram.org/bot{token}/getUpdates?timeout=0"
+               f"&offset={conto['offset'] + 1}&allowed_updates=%5B%22message%22%5D")
+        try:
+            with urllib.request.urlopen(url, timeout=20) as r:
+                risultati = json.loads(r.read().decode())["result"]
+        except Exception as e:
+            print(f"non riesco a leggere i messaggi Telegram: {e}")
+            return
+    for u in risultati:
+        conto["offset"] = max(conto["offset"], u["update_id"])
+        msg = u.get("message") or {}
+        if str(msg.get("chat", {}).get("id")) != str(chat):
+            continue  # accetta comandi solo da te
+        testo = msg.get("text")
+        if testo:
+            manda(interpreta(testo, conto, adesso), dry)
+
+
 # ---------- una seduta ----------
 
 def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
@@ -233,6 +349,7 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         return
 
     righe_range, senza_segnale = [], []
+    inizio = len(messaggi)  # il messaggio del range va prima dei segnali
     for sim in cs["simboli"]:
         k = f"{chiave}:{sim['yahoo']}"
         try:
@@ -327,7 +444,7 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
                 f"{ora_it(fine)}.")
         if s["macro"]:
             coda += "\nControlla il calendario economico (BoE, inflazione UK, PIL)."
-        messaggi.append("\n".join([intro] + righe_range + [coda]))
+        messaggi.insert(inizio, "\n".join([intro] + righe_range + [coda]))
     if senza_segnale and f"{chiave}:fine" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:fine")
         messaggi.append(f"⏹ {s['nome']}: nessun segnale entro le {ora_it(fine)} su "
@@ -355,6 +472,13 @@ def main():
         cfg = json.load(f)
     if os.environ.get("SALDO_EUR"):
         cfg["saldo_eur"] = float(os.environ["SALDO_EUR"].replace(",", "."))
+
+    # il saldo di partenza è il secret SALDO_EUR; poi lo aggiornano i tuoi messaggi su Telegram
+    conto = carica_conto(cfg["saldo_eur"])
+    finto = args[args.index("--messaggi") + 1] if "--messaggi" in args else None
+    leggi_messaggi(conto, adesso, dry, finto)
+    salva_conto(conto)
+    cfg["saldo_eur"] = conto["saldo"]
 
     oggi = dt.datetime.fromtimestamp(adesso, IT).date().isoformat()
     st = carica_stato(oggi)

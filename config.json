@@ -1,0 +1,29 @@
+{
+  "saldo_eur": 917.87,
+  "rischio_pct": 1.0,
+  "tetto_giornaliero_pct": 5.0,
+  "target_R": 2.0,
+  "range_anomalo_sopra": 2.0,
+  "range_anomalo_sotto": 0.4,
+
+  "londra": {
+    "attiva": true,
+    "short": true,
+    "simboli": [
+      {"yahoo": "^FTSE",  "nome": "UK100 (FTSE 100)", "unita": "lotti",  "valore_punto": 1.0, "step": 0.01, "minimo": 0.01, "spread": 1.0},
+      {"yahoo": "BP.L",   "nome": "BP",               "unita": "azioni", "valore_punto": 1.0, "step": 1,    "minimo": 1,    "spread": 0.0},
+      {"yahoo": "SHEL.L", "nome": "Shell",            "unita": "azioni", "valore_punto": 1.0, "step": 1,    "minimo": 1,    "spread": 0.0}
+    ]
+  },
+
+  "usa": {
+    "attiva": true,
+    "short": false,
+    "simboli": [
+      {"yahoo": "TSLA", "nome": "Tesla",  "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "NVDA", "nome": "Nvidia", "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "AAPL", "nome": "Apple",  "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0},
+      {"yahoo": "AMD",  "nome": "AMD",    "unita": "azioni", "valore_punto": 1.0, "step": 1, "minimo": 1, "spread": 0.0}
+    ]
+  }
+}

@@ -430,19 +430,27 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         if s["macro"]:
             testo.append("Prima di entrare: c'è un dato UK stamattina (BoE, inflazione, PIL)? Se sì, niente trade.")
         ritardo = (adesso - (barra["t"] + BAR)) // 60
-        if ritardo >= 10:
-            testo.append(f"⚠️ Avviso arrivato con {ritardo} min di ritardo: il prezzo può essere già lontano, "
-                         f"un'entrata in ritardo è un trade diverso.")
-        stessi = [x for x in st["segnali"] if x["sessione"] == chiave and x["lato"] == lato]
-        if stessi and chiave == "londra":
+        scaduto = ritardo >= cfg.get("ritardo_max_min", 15) or adesso > fine
+        if scaduto:
+            testo.insert(0, f"⏱ SEGNALE SCADUTO: arrivato {ritardo} min dopo la candela. NON entrare, "
+                            f"è solo per il registro (per vedere se la regola avrebbe funzionato).")
+        elif ritardo >= 7:
+            testo.append(f"⚠️ Avviso arrivato con {ritardo} min di ritardo: controlla che il prezzo su MT5 "
+                         f"sia ancora vicino all'entrata.")
+        stessi = [x for x in st["segnali"] if x["sessione"] == chiave and x["lato"] == lato
+                  and not x.get("scaduto")]
+        if stessi and not scaduto:
             testo.append("⚠️ Correlazione: hai già un segnale nella stessa direzione su "
-                         + ", ".join(x["nome"] for x in stessi) + " (si muovono insieme).")
-        if st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
+                         + ", ".join(x["nome"] for x in stessi)
+                         + ". Questi titoli si muovono spesso insieme: prenderli tutti è quasi un unico trade più grosso.")
+        if scaduto:
+            pass  # non conta nel tetto: non si prende
+        elif st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
             testo.insert(0, f"⛔ TETTO GIORNALIERO: con questo il rischio di oggi supererebbe {num(tetto)} € "
                             f"(5%). Questo NON si prende.")
         else:
             st["rischio_eur"] += p["rischio_eur"]
-        st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], lato=lato))
+        st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], lato=lato, scaduto=scaduto))
         testo.append("Verifica i livelli su MT5 (Yahoo può differire dal CFD). Nessun ordine piazzato.")
         messaggi.append("\n".join(testo))
 
@@ -459,7 +467,7 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
                         + ", ".join(senza_segnale) + ". Oggi niente trade lì: va bene così.")
     if adesso >= chiusura and f"{chiave}:chiudi" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:chiudi")
-        if any(x["sessione"] == chiave for x in st["segnali"]):
+        if any(x["sessione"] == chiave and not x.get("scaduto") for x in st["segnali"]):
             messaggi.append(f"⏰ {s['nome']}: sono le {ora_it(chiusura)}. Chiudi a mano le posizioni aperte "
                             f"(MT5 non lo fa da solo). Poi segna l'esito in R nel registro.")
 

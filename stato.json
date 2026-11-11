@@ -1,0 +1,17 @@
+{
+ "data": "2026-11-11",
+ "inviati": [
+  "londra:^FTSE:range",
+  "londra:BP.L:range",
+  "londra:BP.L:segnale",
+  "londra:fine"
+ ],
+ "rischio_eur": 9.977530859637387,
+ "segnali": [
+  {
+   "sessione": "londra",
+   "nome": "BP",
+   "lato": "long"
+  }
+ ]
+}

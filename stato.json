@@ -11,7 +11,8 @@
   "usa:AMD:range",
   "usa:AMD:segnale",
   "londra:chiudi",
-  "usa:TSLA:segnale"
+  "usa:TSLA:segnale",
+  "usa:fine"
  ],
  "rischio_eur": 7.278810086596647,
  "segnali": [

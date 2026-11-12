@@ -8,7 +8,8 @@
   "usa:TSLA:range",
   "usa:NVDA:range",
   "usa:AAPL:range",
-  "usa:AMD:range"
+  "usa:AMD:range",
+  "usa:AMD:segnale"
  ],
  "rischio_eur": 0.0,
  "segnali": [

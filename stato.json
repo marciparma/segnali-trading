@@ -10,15 +10,22 @@
   "usa:AAPL:range",
   "usa:AMD:range",
   "usa:AMD:segnale",
-  "londra:chiudi"
+  "londra:chiudi",
+  "usa:TSLA:segnale"
  ],
- "rischio_eur": 0.0,
+ "rischio_eur": 7.278810086596647,
  "segnali": [
   {
    "sessione": "londra",
    "nome": "BP",
    "lato": "long",
    "scaduto": true
+  },
+  {
+   "sessione": "usa",
+   "nome": "Tesla (TSLA)",
+   "lato": "long",
+   "scaduto": false
   }
  ]
 }

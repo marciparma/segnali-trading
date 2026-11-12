@@ -12,7 +12,8 @@
   "usa:AMD:segnale",
   "londra:chiudi",
   "usa:TSLA:segnale",
-  "usa:fine"
+  "usa:fine",
+  "usa:chiudi"
  ],
  "rischio_eur": 7.278810086596647,
  "segnali": [

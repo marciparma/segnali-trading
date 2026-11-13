@@ -4,7 +4,11 @@
   "londra:^FTSE:range",
   "londra:BP.L:range",
   "londra:BP.L:segnale",
-  "londra:^FTSE:segnale"
+  "londra:^FTSE:segnale",
+  "usa:TSLA:range",
+  "usa:NVDA:range",
+  "usa:AAPL:range",
+  "usa:AMD:range"
  ],
  "rischio_eur": 19.912801539175064,
  "segnali": [

@@ -8,7 +8,8 @@
   "usa:TSLA:range",
   "usa:NVDA:range",
   "usa:AAPL:range",
-  "usa:AMD:range"
+  "usa:AMD:range",
+  "londra:chiudi"
  ],
  "rischio_eur": 19.912801539175064,
  "segnali": [

@@ -2,8 +2,16 @@
  "data": "2026-11-13",
  "inviati": [
   "londra:^FTSE:range",
-  "londra:BP.L:range"
+  "londra:BP.L:range",
+  "londra:BP.L:segnale"
  ],
- "rischio_eur": 0.0,
- "segnali": []
+ "rischio_eur": 10.040999216205988,
+ "segnali": [
+  {
+   "sessione": "londra",
+   "nome": "BP",
+   "lato": "short",
+   "scaduto": false
+  }
+ ]
 }

@@ -10,7 +10,8 @@
   "usa:AAPL:range",
   "usa:AMD:range",
   "londra:chiudi",
-  "usa:fine"
+  "usa:fine",
+  "usa:chiudi"
  ],
  "rischio_eur": 19.912801539175064,
  "segnali": [

@@ -1,31 +1,6 @@
 {
- "data": "2026-11-13",
- "inviati": [
-  "londra:^FTSE:range",
-  "londra:BP.L:range",
-  "londra:BP.L:segnale",
-  "londra:^FTSE:segnale",
-  "usa:TSLA:range",
-  "usa:NVDA:range",
-  "usa:AAPL:range",
-  "usa:AMD:range",
-  "londra:chiudi",
-  "usa:fine",
-  "usa:chiudi"
- ],
- "rischio_eur": 19.912801539175064,
- "segnali": [
-  {
-   "sessione": "londra",
-   "nome": "BP",
-   "lato": "short",
-   "scaduto": false
-  },
-  {
-   "sessione": "londra",
-   "nome": "UK100.s (FTSE 100)",
-   "lato": "long",
-   "scaduto": false
-  }
- ]
+ "data": "2026-11-14",
+ "inviati": [],
+ "rischio_eur": 0.0,
+ "segnali": []
 }

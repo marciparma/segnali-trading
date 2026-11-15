@@ -15,10 +15,6 @@ on:
         description: "Manda solo un messaggio di prova su Telegram"
         type: boolean
         default: false
-      demo:
-        description: "Segnale di prova per un simbolo (es. AAPL). Lascia vuoto per il funzionamento normale"
-        type: string
-        default: ""
 
 permissions:
   contents: write
@@ -42,7 +38,6 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SALDO_EUR: ${{ secrets.SALDO_EUR }}
           TEST: ${{ github.event.inputs.test }}
-          DEMO: ${{ github.event.inputs.demo }}
         run: python3 segnali.py
 
       - name: Salva avvisi mandati e saldo

@@ -48,6 +48,14 @@ def num(x, dec=2):
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def esc(x):
+    return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def b(x):
+    return f"<b>{esc(x)}</b>"
+
+
 def ora_it(ts):
     return dt.datetime.fromtimestamp(ts, IT).strftime("%H:%M")
 
@@ -79,7 +87,8 @@ class Dati:
             if None in (o, h, l, c):
                 continue
             barre.append(dict(t=int(t), o=o, h=h, l=l, c=c))
-        return r["meta"].get("currency", "USD"), barre
+        prezzo = r["meta"].get("regularMarketPrice") or (barre[-1]["c"] if barre else None)
+        return r["meta"].get("currency", "USD"), barre, prezzo
 
     def _yahoo(self, path):
         ultimo = "nessuna risposta"
@@ -108,7 +117,7 @@ class Dati:
         coppia = {"USD": "EURUSD=X", "GBP": "EURGBP=X", "GBp": "EURGBP=X", "GBX": "EURGBP=X"}.get(valuta)
         if not coppia:
             raise RuntimeError(f"valuta {valuta} non gestita")
-        _, barre = self.grafico(coppia, "1d")
+        _, barre, _ = self.grafico(coppia, "1d")
         tasso = barre[-1]["c"]
         fattore = 0.01 if valuta in ("GBp", "GBX") else 1.0  # le azioni UK quotano in pence
         return fattore / tasso
@@ -142,7 +151,8 @@ def larghezza_media_precedente(barre, giorno, s):
     return sum(larghezze) / len(larghezze) if larghezze else None
 
 
-def cerca_segnale(barre, ap, fine_entrate, hi, lo, short, adesso):
+def cerca_segnale(barre, ap, fine_entrate, hi, adesso):
+    """Prima candela M5 chiusa sopra il massimo del range, entro l'orario limite (solo long)."""
     for b in barre:
         chiusura = b["t"] + BAR
         if b["t"] < ap + 3 * BAR or chiusura > adesso:
@@ -150,39 +160,32 @@ def cerca_segnale(barre, ap, fine_entrate, hi, lo, short, adesso):
         if chiusura > fine_entrate:
             return None
         if b["c"] > hi:
-            return "long", b
-        if short and b["c"] < lo:
-            return "short", b
+            return b
     return None
 
 
-def piano(lato, barra, hi, lo, sim, cfg, cambio):
-    entrata = barra["c"]
+def piano(entrata, hi, lo, sim, cfg, cambio):
+    """Long: stop a metà range (o al minimo se troppo vicino), target R volte il rischio, lotti all'1%."""
     meta = (hi + lo) / 2
     minimo_rischio = max(entrata * 0.0005, 3 * sim.get("spread", 0.0))
-    if lato == "long":
-        stop, regola = math.floor(meta * 100) / 100, "metà range"
-        if entrata - stop < minimo_rischio:
-            stop, regola = math.floor(lo * 100) / 100, "minimo del range (metà troppo vicina)"
-        rischio_u = entrata - stop
-    else:
-        stop, regola = math.ceil(meta * 100) / 100, "metà range"
-        if stop - entrata < minimo_rischio:
-            stop, regola = math.ceil(hi * 100) / 100, "massimo del range (metà troppo vicina)"
-        rischio_u = stop - entrata
+    stop, regola = math.floor(meta * 100) / 100, "metà range"
+    if entrata - stop < minimo_rischio:
+        stop, regola = math.floor(lo * 100) / 100, "minimo del range (metà troppo vicina)"
+    rischio_u = entrata - stop
     if rischio_u < minimo_rischio:
         return None, "stop troppo vicino all'entrata (lo spread ti farebbe uscire subito)"
     R = cfg["target_R"]
-    target = round(entrata + R * rischio_u, 2) if lato == "long" else round(entrata - R * rischio_u, 2)
+    target = round(entrata + R * rischio_u, 2)
     rischio_max = cfg["saldo_eur"] * cfg["rischio_pct"] / 100
     eur_per_unita = rischio_u * cambio * sim.get("valore_punto", 1.0)
     step = sim.get("step", 1)
     qta = math.floor(rischio_max / eur_per_unita / step + 1e-9) * step
-    if qta < sim.get("minimo", step):
-        return None, (f"anche la quantità minima ({sim.get('minimo', step)}) rischierebbe "
-                      f"{num(sim.get('minimo', step) * eur_per_unita)} €, oltre il tuo massimo di {num(rischio_max)} €")
+    minimo = sim.get("minimo", step)
+    if qta < minimo:
+        return None, (f"anche la quantità minima ({num(minimo, 0 if minimo >= 1 else 2)}) rischierebbe "
+                      f"{num(minimo * eur_per_unita)} €, oltre il tuo massimo di {num(rischio_max)} €")
     dec = 0 if step >= 1 else len(str(step).split(".")[1])
-    return dict(entrata=entrata, stop=stop, regola=regola, target=target, R=R,
+    return dict(entrata=entrata, stop=stop, regola=regola, target=target, R=R, rischio_u=rischio_u,
                 qta=round(qta, dec), dec=dec, rischio_eur=qta * eur_per_unita), None
 
 
@@ -213,7 +216,8 @@ def manda(testo, dry):
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
         sys.exit("Mancano TELEGRAM_TOKEN e TELEGRAM_CHAT_ID (vanno nei Secrets di GitHub)")
-    dati = urllib.parse.urlencode({"chat_id": chat, "text": testo, "disable_web_page_preview": "true"}).encode()
+    dati = urllib.parse.urlencode({"chat_id": chat, "text": testo, "parse_mode": "HTML",
+                                   "disable_web_page_preview": "true"}).encode()
     with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", dati, timeout=20) as r:
         r.read()
 
@@ -263,14 +267,14 @@ def interpreta(testo, conto, adesso):
                 "• saldo   → ti dico saldo attuale e ultimi movimenti\n"
                 "• saldo 1002,50 → imposto il saldo esatto (copialo da MT5)\n"
                 "• annulla → tolgo l'ultimo movimento\n"
-                "Rispondo al controllo successivo (di solito entro 5 minuti nei giorni di borsa, "
+                "Rispondo al controllo successivo (entro 1-2 minuti nei giorni di borsa dalle 9 alle 23, "
                 "altrimenti entro un'ora).")
     if basso.startswith("annulla"):
         if not conto["movimenti"]:
             return "Non c'è nessun movimento da annullare."
         ultimo = conto["movimenti"].pop()
         conto["saldo"] = round(conto["saldo"] - ultimo["importo"], 2)
-        return f"Annullato: {ultimo['nota']} ({num(ultimo['importo'])} €). Saldo: {num(conto['saldo'])} €."
+        return f"Annullato: {esc(ultimo['nota'])} ({num(ultimo['importo'])} €). Saldo: {num(conto['saldo'])} €."
     if basso.startswith("saldo") or basso.startswith("/saldo"):
         v, _ = leggi_numero(t[5:])
         if v is not None:
@@ -284,7 +288,7 @@ def interpreta(testo, conto, adesso):
         ultimi = [m for m in conto["movimenti"] if m["nota"] != "saldo impostato a mano"][-5:]
         if ultimi:
             righe.append("Ultimi movimenti:")
-            righe += [f"• {m['data']}  {'+' if m['importo'] >= 0 else ''}{num(m['importo'])} €  {m['nota']}"
+            righe += [f"• {m['data']}  {'+' if m['importo'] >= 0 else ''}{num(m['importo'])} €  {esc(m['nota'])}"
                       for m in ultimi]
         return "\n".join(righe)
     v, segno = leggi_numero(t)
@@ -302,6 +306,7 @@ def interpreta(testo, conto, adesso):
     conto["movimenti"].append(dict(data=oggi, importo=round(v, 2), nota=nome))
     conto["movimenti"] = conto["movimenti"][-200:]
     icona = "✅" if v >= 0 else "🔻"
+    nome = esc(nome)
     return (f"{icona} Registrato {nome}: {'+' if v >= 0 else ''}{num(v)} €.\n"
             f"Nuovo saldo: {num(conto['saldo'])} € · rischio per trade ≈ {num(conto['saldo'] * 0.01)} €.")
 
@@ -344,132 +349,269 @@ def leggi_messaggi(conto, adesso, dry, file_finto=None):
 
 # ---------- una seduta ----------
 
+def ordine_pendente(hi, prezzo, sim):
+    """Livello del Buy Stop: appena sopra il massimo del range."""
+    margine = max(sim.get("spread", 0.0), hi * 0.0001, 0.01)
+    return round(hi + margine, 2)
+
+
+def analizza(sim, s, cs, cfg, dati, giorno, ap, fine, adesso):
+    valuta, barre, prezzo = dati.grafico(sim["yahoo"])
+    if dati.offline:  # rivedendo una giornata salvata: niente dati "dal futuro"
+        barre = [x for x in barre if x["t"] <= adesso - 60]
+        prezzo = barre[-1]["c"] if barre else None
+    bs, _ = barre_seduta(barre, giorno, s)
+    info = dict(sim=sim, valuta=valuta, bs=bs, prezzo=prezzo, rg=None)
+    if not bs:
+        return info
+    rg = range_iniziale(bs, ap, adesso)
+    if not rg:
+        return info
+    hi, lo = rg
+    media = larghezza_media_precedente(barre, giorno, s)
+    larg = hi - lo
+    rapporto = larg / media if media else None
+    anomalo = bool(rapporto) and (rapporto > cfg["range_anomalo_sopra"] or rapporto < cfg["range_anomalo_sotto"])
+    info.update(rg=rg, hi=hi, lo=lo, larg=larg, rapporto=rapporto, anomalo=anomalo,
+                segnale=cerca_segnale(bs, ap, fine, hi, adesso))
+    return info
+
+
+def esito_dopo(info, barra, p):
+    """Dopo il segnale: ha toccato prima SL o TP? Altrimenti a quanti R siamo."""
+    for x in info["bs"]:
+        if x["t"] < barra["t"] + BAR:
+            continue
+        if x["l"] <= p["stop"]:
+            return "sl", -1.0
+        if x["h"] >= p["target"]:
+            return "tp", p["R"]
+    prezzo = info["prezzo"] or barra["c"]
+    return "aperto", (prezzo - p["entrata"]) / p["rischio_u"]
+
+
+def righe_ordine(tipo, prezzo, p, unita):
+    return [f"<b>{tipo}</b> {num(prezzo)}" if prezzo is not None else f"<b>{tipo}</b>",
+            f"<b>{unita.upper()}</b> {num(p['qta'], p['dec'])}",
+            f"<b>SL</b> {num(p['stop'])}",
+            f"<b>TP</b> {num(p['target'])}"]
+
+
 def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
     s = SESSIONI[chiave]
     cs = cfg[chiave]
-    giorno = dt.datetime.fromtimestamp(adesso, ZoneInfo(s["tz"])).date()
+    tz = s["tz"]
+    giorno = dt.datetime.fromtimestamp(adesso, ZoneInfo(tz)).date()
     if giorno.weekday() >= 5:
         return
-    ap = a_ts(giorno, s["apertura"], s["tz"])
-    fine = a_ts(giorno, s["fine_entrate"], s["tz"])
-    chiusura = a_ts(giorno, s["chiusura"], s["tz"])
+    ap = a_ts(giorno, s["apertura"], tz)
+    fine = a_ts(giorno, s["fine_entrate"], tz)
+    chiusura = a_ts(giorno, s["chiusura"], tz)
+    meta = ap + ((fine - ap) // 2 // BAR) * BAR  # metà della finestra delle entrate
     if adesso < ap + 3 * BAR or adesso > chiusura + 1800:
         return
 
-    righe_range, senza_segnale = [], []
-    inizio = len(messaggi)  # il messaggio del range va prima dei segnali
+    analisi = []
     for sim in cs["simboli"]:
         k = f"{chiave}:{sim['yahoo']}"
         try:
-            valuta, barre = dati.grafico(sim["yahoo"])
+            info = analizza(sim, s, cs, cfg, dati, giorno, ap, fine, adesso)
         except Exception as e:
             if f"{k}:errore" not in st["inviati"]:
                 st["inviati"].append(f"{k}:errore")
-                messaggi.append(f"⚠️ {sim['nome']}: non riesco a leggere i dati ({e}). Controlla tu su MT5.")
+                messaggi.append(f"⚠️ {esc(sim['nome'])}: non riesco a leggere i dati ({esc(e)}). Controlla tu su MT5.")
             continue
-        bs, _ = barre_seduta(barre, giorno, s)
-        if not bs:
-            continue  # mercato chiuso (festivo) o dati non ancora arrivati
-        rg = range_iniziale(bs, ap, adesso)
-        if not rg:
-            continue
-        hi, lo = rg
-        media = larghezza_media_precedente(barre, giorno, s)
-        larg = hi - lo
-        anomalo = media and (larg > cfg["range_anomalo_sopra"] * media or larg < cfg["range_anomalo_sotto"] * media)
+        if info["rg"]:
+            info["k"] = k
+            analisi.append(info)
 
-        if f"{k}:range" not in st["inviati"]:
-            st["inviati"].append(f"{k}:range")
-            nota = ""
-            if media:
-                nota = f" ({num(larg / media * 100, 0)}% del solito)"
-            if anomalo:
-                nota += " ⛔ ANOMALO: oggi niente trade su questo"
-            righe_range.append(f"• {sim['nome']}: {num(lo)} – {num(hi)}  largh. {num(larg)}{nota}")
+    def cambio(info):
+        if "cambio" not in info:
+            info["cambio"] = dati.cambio_eur(info["valuta"])
+        return info["cambio"]
 
-        if anomalo or f"{k}:segnale" in st["inviati"]:
-            continue
-        trovato = cerca_segnale(bs, ap, fine, hi, lo, cs.get("short", False), adesso)
-        if not trovato:
-            if adesso >= fine:
-                senza_segnale.append(sim["nome"])
-            continue
-
-        lato, barra = trovato
-        st["inviati"].append(f"{k}:segnale")
-        try:
-            cambio = dati.cambio_eur(valuta)
-        except Exception as e:
-            messaggi.append(f"⚠️ {sim['nome']}: segnale {lato.upper()} ma non riesco a leggere il cambio ({e}).")
-            continue
-        p, motivo = piano(lato, barra, hi, lo, sim, cfg, cambio)
-        quando = ora_it(barra["t"] + BAR)
-        if not p:
-            messaggi.append(f"⚪ {sim['nome']} ({s['nome']}): segnale {lato.upper()} alle {quando} "
-                            f"ma NIENTE TRADE: {motivo}.")
-            continue
-
-        tetto = cfg["saldo_eur"] * cfg["tetto_giornaliero_pct"] / 100
-        icona = "🟢 LONG" if lato == "long" else "🔴 SHORT"
-        tipo = "Buy Stop" if lato == "long" else "Sell Stop"
-        livello = hi if lato == "long" else lo
-        unita = sim.get("unita", "azioni")
-        testo = [
-            f"{icona} {sim['nome']} — {s['nome']}",
-            f"Entrata: {num(p['entrata'])} (a mercato)  oppure {tipo} appena {'sopra' if lato == 'long' else 'sotto'} {num(livello)}",
-            f"Stop Loss: {num(p['stop'])}  ({p['regola']})",
-            f"Take Profit: {num(p['target'])}  ({num(p['R'], 1)}R)",
-            f"{unita.capitalize()}: {num(p['qta'], p['dec'])}  · rischio ≈ {num(p['rischio_eur'])} €",
-            f"Scadenza ordine: {ora_it(fine)} · chiudi a mano entro le {ora_it(chiusura)}",
-            "",
-            f"Perché: la candela delle {ora_it(barra['t'])} ha chiuso a {num(barra['c'])}, "
-            f"{'sopra il massimo' if lato == 'long' else 'sotto il minimo'} del range ({num(lo)} – {num(hi)}).",
-        ]
-        if valuta in ("GBp", "GBX"):
-            testo.append("Prezzi in pence (GBX): 600 = 6,00 £.")
+    # ---- 1. messaggio del range: analisi + a cosa predisporti ----
+    nuovi = [i for i in analisi if f"{i['k']}:range" not in st["inviati"]]
+    if nuovi:
+        righe = [f"📏 <b>Range iniziale {s['nome']}</b> ({ora_it(ap)}–{ora_it(ap + 3 * BAR)})"]
+        prep, attenzione = [], []
+        for i in nuovi:
+            st["inviati"].append(f"{i['k']}:range")
+            sim, hi, lo, pz = i["sim"], i["hi"], i["lo"], i["prezzo"]
+            nota = f" ({num(i['rapporto'] * 100, 0)}% del solito)" if i["rapporto"] else ""
+            riga = f"• {esc(sim['nome'])}: {num(lo)} – {num(hi)} · largh. {num(i['larg'])}{nota}"
+            if pz:
+                riga += f" · ora {num(pz)}"
+            righe.append(riga)
+            if i["anomalo"]:
+                attenzione.append(f"⛔ {esc(sim['nome'])}: range anomalo, oggi niente trade su questo.")
+                continue
+            livello = ordine_pendente(hi, pz, sim)
+            try:
+                p, motivo = piano(livello, hi, lo, sim, cfg, cambio(i))
+            except Exception as e:
+                p, motivo = None, f"cambio non disponibile ({esc(e)})"
+            if not p:
+                attenzione.append(f"⚪ {esc(sim['nome'])}: anche se rompe, niente trade: {motivo}.")
+                continue
+            prep.append("\n".join([f"▸ <b>{esc(sim['nome'])}</b>"] + righe_ordine("BUY STOP", livello, p, sim.get("unita", "lotti"))
+                                  + [f"rischio ≈ {num(p['rischio_eur'])} € · scadenza {ora_it(fine)}"]))
+            if pz and pz >= hi:
+                attenzione.append(f"⚠️ {esc(sim['nome'])}: il prezzo è già sopra il massimo, il Buy Stop non si può "
+                                  f"inserire: aspetta il messaggio del segnale.")
+            elif pz and livello - pz < sim.get("distanza_min", 0):
+                attenzione.append(f"⚠️ {esc(sim['nome'])}: il Buy Stop è a meno di {num(sim['distanza_min'], 0)} punti dal "
+                                  f"prezzo, MT5 potrebbe rifiutarlo: in quel caso aspetta il segnale.")
+            if i["rapporto"] and i["rapporto"] < 0.6:
+                attenzione.append(f"⚠️ {esc(sim['nome'])}: range stretto, i falsi breakout sono più probabili e lo stop è "
+                                  f"vicino: controlla lo spread.")
+            elif i["rapporto"] and i["rapporto"] > 1.5:
+                attenzione.append(f"⚠️ {esc(sim['nome'])}: range largo, stop lontano e pochi lotti.")
+        if len(prep) >= 3:
+            attenzione.append("⚠️ Questi titoli spesso si muovono insieme: se scattano più ordini è quasi un unico trade "
+                              "più grosso. Valuta di prenderne al massimo 2.")
         if s["macro"]:
-            testo.append("Prima di entrare: c'è un dato UK stamattina (BoE, inflazione, PIL)? Se sì, niente trade.")
+            attenzione.append("📅 Controlla il calendario economico: con BoE, inflazione UK o PIL stamattina, niente trade.")
+        if prep:
+            attenzione.append("ℹ️ Il Buy Stop scatta appena il prezzo tocca il livello, anche senza chiusura sopra: è più "
+                              "veloce ma dà più falsi segnali. Se preferisci la regola stretta, non metterlo e aspetta il "
+                              "messaggio del segnale.")
+        testo = "\n".join(righe)
+        testo += "\n\n🎯 <b>Per cosa predisporti</b>\n"
+        testo += ("\n\n".join(prep) if prep else "Nessun ordine da preparare oggi.")
+        if attenzione:
+            testo += "\n\n" + "\n".join(attenzione)
+        messaggi.append(testo)
+
+    # ---- 2. segnali ----
+    tetto = cfg["saldo_eur"] * cfg["tetto_giornaliero_pct"] / 100
+    for i in analisi:
+        sim, barra = i["sim"], i.get("segnale")
+        if i["anomalo"] or not barra or f"{i['k']}:segnale" in st["inviati"]:
+            continue
+        st["inviati"].append(f"{i['k']}:segnale")
+        quando = ora_it(barra["t"] + BAR)
+        try:
+            p, motivo = piano(barra["c"], i["hi"], i["lo"], sim, cfg, cambio(i))
+        except Exception as e:
+            p, motivo = None, f"cambio non disponibile ({esc(e)})"
+        if not p:
+            messaggi.append(f"⚪ {esc(sim['nome'])} ({s['nome']}): segnale alle {quando} ma <b>NIENTE TRADE</b>: {motivo}.")
+            st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], scaduto=True))
+            continue
         ritardo = (adesso - (barra["t"] + BAR)) // 60
         scaduto = ritardo >= cfg.get("ritardo_max_min", 15) or adesso > fine
-        if scaduto:
-            testo.insert(0, f"⏱ SEGNALE SCADUTO: arrivato {ritardo} min dopo la candela. NON entrare, "
-                            f"è solo per il registro (per vedere se la regola avrebbe funzionato).")
-        elif ritardo >= 7:
-            testo.append(f"⚠️ Avviso arrivato con {ritardo} min di ritardo: controlla che il prezzo su MT5 "
-                         f"sia ancora vicino all'entrata.")
-        stessi = [x for x in st["segnali"] if x["sessione"] == chiave and x["lato"] == lato
-                  and not x.get("scaduto")]
-        if stessi and not scaduto:
-            testo.append("⚠️ Correlazione: hai già un segnale nella stessa direzione su "
-                         + ", ".join(x["nome"] for x in stessi)
-                         + ". Questi titoli si muovono spesso insieme: prenderli tutti è quasi un unico trade più grosso.")
-        if scaduto:
-            pass  # non conta nel tetto: non si prende
-        elif st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
-            testo.insert(0, f"⛔ TETTO GIORNALIERO: con questo il rischio di oggi supererebbe {num(tetto)} € "
-                            f"(5%). Questo NON si prende.")
+        pz = i["prezzo"] or barra["c"]
+        if pz < i["hi"]:
+            tipo, livello = "BUY LIMIT", None
+        elif pz > p["entrata"] + 0.3 * p["rischio_u"]:
+            tipo, livello = "BUY LIMIT", p["entrata"]
         else:
-            st["rischio_eur"] += p["rischio_eur"]
-        st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], lato=lato, scaduto=scaduto))
+            tipo, livello = "BUY", p["entrata"]
+        unita = sim.get("unita", "lotti")
+        testo = []
+        if scaduto:
+            testo.append(f"⏱ <b>SEGNALE SCADUTO</b> ({ritardo} min dopo la candela): NON entrare, è solo per il registro.\n")
+        testo.append(f"🟢 <b>{esc(sim['nome'])}</b> — {s['nome']}")
+        if pz < i["hi"]:
+            scaduto = True  # non si prende: non conta nel tetto
+            testo.append(f"<b>NESSUN ORDINE</b>: il prezzo ({num(pz)}) è già tornato dentro il range, falso "
+                         f"breakout probabile. Se il Buy Stop è scattato, tieni SL {num(p['stop'])} e TP "
+                         f"{num(p['target'])}.")
+        else:
+            testo += righe_ordine(tipo, livello, p, unita)
+        testo.append("")
+        testo.append(f"Rischio ≈ {num(p['rischio_eur'])} € · scadenza {ora_it(fine)} · chiudi a mano entro le "
+                     f"{ora_it(chiusura)}")
+        testo.append(f"Perché: la candela delle {ora_it(barra['t'])} ha chiuso a {num(barra['c'])}, sopra il massimo "
+                     f"del range ({num(i['lo'])} – {num(i['hi'])}). Stop a {p['regola']}, target {num(p['R'], 1)}R.")
+        if tipo == "BUY LIMIT" and livello and not scaduto:
+            testo.append(f"Il prezzo è già salito a {num(pz)}: invece di inseguirlo, metti un ordine limite a "
+                         f"{num(livello)} (il prezzo del segnale), valido fino alle {ora_it(fine)}.")
+        testo.append("Se il Buy Stop del messaggio del range è già scattato, non aprire un'altra posizione: tieni "
+                     "SL e TP di quel messaggio.")
+        if i["valuta"] in ("GBp", "GBX"):
+            testo.append("Prezzi in pence (GBX): 600 = 6,00 £.")
+        if not scaduto and 7 <= ritardo:
+            testo.append(f"⚠️ Arrivato {ritardo} min dopo la candela: controlla il prezzo su MT5 prima di entrare.")
+        mancano = (chiusura - adesso) // 60
+        if not scaduto and mancano < 90:
+            testo.append(f"⚠️ Mancano {mancano} min alla chiusura delle {ora_it(chiusura)}: il TP difficilmente si "
+                         f"raggiunge, valuta se entrare.")
+        stessi = [x["nome"] for x in st["segnali"] if x["sessione"] == chiave and not x.get("scaduto")]
+        if stessi and not scaduto:
+            testo.append("⚠️ Correlazione: oggi c'è già un segnale su " + esc(", ".join(stessi))
+                         + ". Prenderli tutti è quasi un unico trade più grosso.")
+        if not scaduto:
+            if st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
+                testo.insert(0, f"⛔ <b>TETTO GIORNALIERO</b>: con questo il rischio di oggi supererebbe "
+                                f"{num(tetto)} €. Questo NON si prende.\n")
+            else:
+                st["rischio_eur"] += p["rischio_eur"]
+        st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], scaduto=scaduto))
         testo.append("Verifica i livelli su MT5 (Yahoo può differire dal CFD). Nessun ordine piazzato.")
         messaggi.append("\n".join(testo))
 
-    if righe_range:
-        intro = f"📏 Range iniziale {s['nome']} ({ora_it(ap)}–{ora_it(ap + 3 * BAR)}):"
-        coda = ("Segnale se una candela M5 chiude fuori dal range entro le "
-                f"{ora_it(fine)}.")
-        if s["macro"]:
-            coda += "\nControlla il calendario economico (BoE, inflazione UK, PIL)."
-        messaggi.insert(inizio, "\n".join([intro] + righe_range + [coda]))
-    if senza_segnale and f"{chiave}:fine" not in st["inviati"]:
+    # ---- 3. a metà sessione: com'è la situazione ----
+    if meta <= adesso < fine and f"{chiave}:meta" not in st["inviati"] and analisi:
+        st["inviati"].append(f"{chiave}:meta")
+        righe = [f"🕐 <b>Metà sessione {s['nome']}</b> ({ora_it(adesso)}) · entrate fino alle {ora_it(fine)}, "
+                 f"chiusura {ora_it(chiusura)}"]
+        for i in analisi:
+            sim, nome = i["sim"], esc(i["sim"]["nome"])
+            pz = i["prezzo"]
+            if i["anomalo"]:
+                righe.append(f"• {nome}: escluso oggi (range anomalo).")
+                continue
+            barra = i.get("segnale")
+            if barra:
+                try:
+                    p, motivo = piano(barra["c"], i["hi"], i["lo"], sim, cfg, cambio(i))
+                except Exception:
+                    p, motivo = None, "cambio non disponibile"
+                if not p:
+                    righe.append(f"• {nome}: segnale alle {ora_it(barra['t'] + BAR)}, ma niente trade ({motivo}).")
+                    continue
+                stato, r = esito_dopo(i, barra, p)
+                if stato == "tp":
+                    righe.append(f"• {nome}: ✅ segnale delle {ora_it(barra['t'] + BAR)} arrivato al <b>TP</b> "
+                                 f"{num(p['target'])} (+{num(p['R'], 1)}R).")
+                elif stato == "sl":
+                    righe.append(f"• {nome}: 🔻 segnale delle {ora_it(barra['t'] + BAR)} chiuso allo <b>SL</b> "
+                                 f"{num(p['stop'])} (−1R). Niente altri trade oggi su questo.")
+                else:
+                    righe.append(f"• {nome}: 🟢 in posizione dal segnale delle {ora_it(barra['t'] + BAR)}: ora "
+                                 f"{num(pz)}, <b>{'+' if r >= 0 else ''}{num(r, 1)}R</b> "
+                                 f"(SL {num(p['stop'])} · TP {num(p['target'])}).")
+                continue
+            if pz is None:
+                righe.append(f"• {nome}: nessun segnale, prezzo non disponibile.")
+            elif pz > i["hi"]:
+                righe.append(f"• {nome}: ⏳ ora {num(pz)}, sopra il massimo {num(i['hi'])} ma senza ancora una candela "
+                             f"chiusa sopra: il segnale può arrivare a breve.")
+            elif pz >= i["lo"]:
+                dist = i["hi"] - pz
+                righe.append(f"• {nome}: ⏳ in attesa: ora {num(pz)}, mancano {num(dist)} "
+                             f"({num(dist / pz * 100, 2)}%) al massimo {num(i['hi'])}. Il Buy Stop "
+                             f"{num(ordine_pendente(i['hi'], pz, sim))} resta valido fino alle {ora_it(fine)}.")
+            else:
+                righe.append(f"• {nome}: ⬇️ ora {num(pz)}, sotto il range: un segnale long è poco probabile. "
+                             f"Se hai il Buy Stop puoi lasciarlo fino alle {ora_it(fine)}.")
+        rischio = st["rischio_eur"]
+        righe.append(f"\nRischio usato oggi: {num(rischio)} € su {num(tetto)} €.")
+        messaggi.append("\n".join(righe))
+
+    # ---- 4. fine finestra e chiusura ----
+    senza = [esc(i["sim"]["nome"]) for i in analisi if not i["anomalo"] and not i.get("segnale")]
+    if adesso >= fine and senza and f"{chiave}:fine" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:fine")
-        messaggi.append(f"⏹ {s['nome']}: nessun segnale entro le {ora_it(fine)} su "
-                        + ", ".join(senza_segnale) + ". Oggi niente trade lì: va bene così.")
+        messaggi.append(f"⏹ {s['nome']}: nessun segnale entro le {ora_it(fine)} su " + ", ".join(senza)
+                        + ". Cancella i Buy Stop non scattati.")
     if adesso >= chiusura and f"{chiave}:chiudi" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:chiudi")
         if any(x["sessione"] == chiave and not x.get("scaduto") for x in st["segnali"]):
             messaggi.append(f"⏰ {s['nome']}: sono le {ora_it(chiusura)}. Chiudi a mano le posizioni aperte "
-                            f"(MT5 non lo fa da solo). Poi segna l'esito in R nel registro.")
+                            f"(MT5 non lo fa da solo). Poi scrivimi il risultato, es. +17,80 o -9,10.")
 
 
 def main():

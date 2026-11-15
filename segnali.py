@@ -614,6 +614,43 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
                             f"(MT5 non lo fa da solo). Poi scrivimi il risultato, es. +17,80 o -9,10.")
 
 
+def segnale_di_prova(codice, cfg, dati):
+    """Messaggio finto nel formato di un segnale vero, per vedere come arriva su Telegram."""
+    for chiave in ("usa", "londra"):
+        for sim in cfg[chiave]["simboli"]:
+            if codice.upper() in (sim["yahoo"].upper(), sim["nome"].upper().split(" ")[0]):
+                break
+        else:
+            continue
+        break
+    else:
+        return f"🧪 Prova: non trovo {esc(codice)} tra i simboli di config.json."
+    s = SESSIONI[chiave]
+    try:
+        valuta, barre, prezzo = dati.grafico(sim["yahoo"])
+        cambio = dati.cambio_eur(valuta)
+    except Exception:
+        valuta, prezzo, cambio = "USD", 250.0, 0.9
+    hi = round(prezzo * 0.999, 2)
+    lo = round(prezzo * 0.991, 2)
+    entrata = round(prezzo * 1.001, 2)
+    p, motivo = piano(entrata, hi, lo, sim, cfg, cambio)
+    if not p:
+        return f"🧪 Prova {esc(sim['nome'])}: niente trade ({motivo})."
+    testo = ["🧪 <b>PROVA</b> — questo NON è un segnale vero, serve solo a vedere il formato.\n",
+             f"🟢 <b>{esc(sim['nome'])}</b> — {s['nome']}"]
+    testo += righe_ordine("BUY", p["entrata"], p, sim.get("unita", "lotti"))
+    oggi = dt.datetime.now(ZoneInfo(s["tz"])).date()
+    testo += ["",
+              f"Rischio ≈ {num(p['rischio_eur'])} € · scadenza {ora_it(a_ts(oggi, s['fine_entrate'], s['tz']))} · "
+              f"chiudi a mano entro le {ora_it(a_ts(oggi, s['chiusura'], s['tz']))}",
+              f"Perché (finto): una candela ha chiuso a {num(p['entrata'])}, sopra il massimo del range "
+              f"({num(lo)} – {num(hi)}). Stop a {p['regola']}, target {num(p['R'], 1)}R.",
+              "Prezzi presi dall'ultima quotazione disponibile: il mercato potrebbe essere chiuso.",
+              "Nessun ordine piazzato."]
+    return "\n".join(testo)
+
+
 def main():
     args = sys.argv[1:]
     dry = "--dry" in args
@@ -638,9 +675,13 @@ def main():
     salva_conto(conto)
     cfg["saldo_eur"] = conto["saldo"]
 
+    dati = Dati(offline)
+    if os.environ.get("DEMO", "").strip():
+        manda(segnale_di_prova(os.environ["DEMO"].strip(), cfg, dati), dry)
+        return
+
     oggi = dt.datetime.fromtimestamp(adesso, IT).date().isoformat()
     st = carica_stato(oggi)
-    dati = Dati(offline)
     messaggi = []
     for chiave in ("londra", "usa"):
         if cfg.get(chiave, {}).get("attiva"):

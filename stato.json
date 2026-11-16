@@ -1,7 +1,8 @@
 {
  "data": "2026-11-16",
  "inviati": [
-  "londra:^FTSE:range"
+  "londra:^FTSE:range",
+  "londra:BP.L:range"
  ],
  "rischio_eur": 0.0,
  "segnali": []

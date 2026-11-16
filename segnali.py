@@ -364,7 +364,10 @@ def analizza(sim, s, cs, cfg, dati, giorno, ap, fine, adesso):
     info = dict(sim=sim, valuta=valuta, bs=bs, prezzo=prezzo, rg=None)
     if not bs:
         return info
-    rg = range_iniziale(bs, ap, adesso)
+    # una candela conta come chiusa solo se Yahoo ha già pubblicato quella dopo:
+    # i dati di Londra arrivano in ritardo e l'ultima candela può essere ancora incompleta
+    chiuse = bs[:-1]
+    rg = range_iniziale(chiuse, ap, adesso)
     if not rg:
         return info
     hi, lo = rg
@@ -373,28 +376,32 @@ def analizza(sim, s, cs, cfg, dati, giorno, ap, fine, adesso):
     rapporto = larg / media if media else None
     anomalo = bool(rapporto) and (rapporto > cfg["range_anomalo_sopra"] or rapporto < cfg["range_anomalo_sotto"])
     info.update(rg=rg, hi=hi, lo=lo, larg=larg, rapporto=rapporto, anomalo=anomalo,
-                segnale=cerca_segnale(bs, ap, fine, hi, adesso))
+                segnale=cerca_segnale(chiuse, ap, fine, hi, adesso))
     return info
 
 
-def esito_dopo(info, barra, p):
+def esito(bs, t_segnale, p, prezzo):
     """Dopo il segnale: ha toccato prima SL o TP? Altrimenti a quanti R siamo."""
-    for x in info["bs"]:
-        if x["t"] < barra["t"] + BAR:
+    for x in bs:
+        if x["t"] < t_segnale + BAR:
             continue
         if x["l"] <= p["stop"]:
             return "sl", -1.0
         if x["h"] >= p["target"]:
             return "tp", p["R"]
-    prezzo = info["prezzo"] or barra["c"]
-    return "aperto", (prezzo - p["entrata"]) / p["rischio_u"]
+    return "aperto", ((prezzo or p["entrata"]) - p["entrata"]) / p["rischio_u"]
 
 
-def righe_ordine(tipo, prezzo, p, unita):
-    return [f"<b>{tipo}</b> {num(prezzo)}" if prezzo is not None else f"<b>{tipo}</b>",
-            f"<b>{unita.upper()}</b> {num(p['qta'], p['dec'])}",
-            f"<b>SL</b> {num(p['stop'])}",
-            f"<b>TP</b> {num(p['target'])}"]
+def ordine(tipo, prezzo, p, unita):
+    righe = [f"<b>{tipo}</b> {num(prezzo)}" if prezzo is not None else f"<b>{tipo}</b>",
+             f"<b>{unita.upper()}</b> {num(p['qta'], p['dec'])}",
+             f"<b>SL</b> {num(p['stop'])}",
+             f"<b>TP</b> {num(p['target'])}"]
+    return "\n".join(righe)
+
+
+def avvertenze(titolo, righe):
+    return f"⚠️ <b>{titolo}</b>\n" + "\n".join(f"• {r}" for r in righe)
 
 
 def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
@@ -410,6 +417,7 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
     meta = ap + ((fine - ap) // 2 // BAR) * BAR  # metà della finestra delle entrate
     if adesso < ap + 3 * BAR or adesso > chiusura + 1800:
         return
+    scad = f"scade {ora_it(fine)} · chiudi entro {ora_it(chiusura)}"
 
     analisi = []
     for sim in cs["simboli"]:
@@ -430,21 +438,18 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
             info["cambio"] = dati.cambio_eur(info["valuta"])
         return info["cambio"]
 
-    # ---- 1. messaggio del range: analisi + a cosa predisporti ----
+    # ---- 1. range: livelli e ordini da preparare (avvertenze a parte) ----
     nuovi = [i for i in analisi if f"{i['k']}:range" not in st["inviati"]]
     if nuovi:
-        righe = [f"📏 <b>Range iniziale {s['nome']}</b> ({ora_it(ap)}–{ora_it(ap + 3 * BAR)})"]
-        prep, attenzione = [], []
+        righe = [f"📏 <b>Range {s['nome']}</b> ({ora_it(ap)}–{ora_it(ap + 3 * BAR)})"]
+        prep, warn = [], []
         for i in nuovi:
             st["inviati"].append(f"{i['k']}:range")
             sim, hi, lo, pz = i["sim"], i["hi"], i["lo"], i["prezzo"]
-            nota = f" ({num(i['rapporto'] * 100, 0)}% del solito)" if i["rapporto"] else ""
-            riga = f"• {esc(sim['nome'])}: {num(lo)} – {num(hi)} · largh. {num(i['larg'])}{nota}"
-            if pz:
-                riga += f" · ora {num(pz)}"
-            righe.append(riga)
+            nome = esc(sim["nome"])
+            righe.append(f"{nome}: {num(lo)} – {num(hi)}")
             if i["anomalo"]:
-                attenzione.append(f"⛔ {esc(sim['nome'])}: range anomalo, oggi niente trade su questo.")
+                warn.append(f"{nome}: range anomalo ({num(i['rapporto'] * 100, 0)}% del solito), oggi niente trade.")
                 continue
             livello = ordine_pendente(hi, pz, sim)
             try:
@@ -452,166 +457,159 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
             except Exception as e:
                 p, motivo = None, f"cambio non disponibile ({esc(e)})"
             if not p:
-                attenzione.append(f"⚪ {esc(sim['nome'])}: anche se rompe, niente trade: {motivo}.")
+                warn.append(f"{nome}: niente trade anche se rompe ({motivo}).")
                 continue
-            prep.append("\n".join([f"▸ <b>{esc(sim['nome'])}</b>"] + righe_ordine("BUY STOP", livello, p, sim.get("unita", "lotti"))
-                                  + [f"rischio ≈ {num(p['rischio_eur'])} € · scadenza {ora_it(fine)}"]))
+            prep.append(f"▸ <b>{nome}</b>\n" + ordine("BUY STOP", livello, p, sim.get("unita", "lotti")))
             if pz and pz >= hi:
-                attenzione.append(f"⚠️ {esc(sim['nome'])}: il prezzo è già sopra il massimo, il Buy Stop non si può "
-                                  f"inserire: aspetta il messaggio del segnale.")
+                warn.append(f"{nome}: prezzo già sopra il massimo, il Buy Stop non si può inserire: aspetta il segnale.")
             elif pz and livello - pz < sim.get("distanza_min", 0):
-                attenzione.append(f"⚠️ {esc(sim['nome'])}: il Buy Stop è a meno di {num(sim['distanza_min'], 0)} punti dal "
-                                  f"prezzo, MT5 potrebbe rifiutarlo: in quel caso aspetta il segnale.")
+                warn.append(f"{nome}: Buy Stop a meno di {num(sim['distanza_min'], 0)} punti dal prezzo, MT5 "
+                            f"potrebbe rifiutarlo.")
             if i["rapporto"] and i["rapporto"] < 0.6:
-                attenzione.append(f"⚠️ {esc(sim['nome'])}: range stretto, i falsi breakout sono più probabili e lo stop è "
-                                  f"vicino: controlla lo spread.")
+                warn.append(f"{nome}: range stretto ({num(i['rapporto'] * 100, 0)}% del solito), più falsi breakout.")
             elif i["rapporto"] and i["rapporto"] > 1.5:
-                attenzione.append(f"⚠️ {esc(sim['nome'])}: range largo, stop lontano e pochi lotti.")
+                warn.append(f"{nome}: range largo ({num(i['rapporto'] * 100, 0)}% del solito), stop lontano.")
         if len(prep) >= 3:
-            attenzione.append("⚠️ Questi titoli spesso si muovono insieme: se scattano più ordini è quasi un unico trade "
-                              "più grosso. Valuta di prenderne al massimo 2.")
-        if s["macro"]:
-            attenzione.append("📅 Controlla il calendario economico: con BoE, inflazione UK o PIL stamattina, niente trade.")
-        if prep:
-            attenzione.append("ℹ️ Il Buy Stop scatta appena il prezzo tocca il livello, anche senza chiusura sopra: è più "
-                              "veloce ma dà più falsi segnali. Se preferisci la regola stretta, non metterlo e aspetta il "
-                              "messaggio del segnale.")
-        testo = "\n".join(righe)
-        testo += "\n\n🎯 <b>Per cosa predisporti</b>\n"
-        testo += ("\n\n".join(prep) if prep else "Nessun ordine da preparare oggi.")
-        if attenzione:
-            testo += "\n\n" + "\n".join(attenzione)
+            warn.append("Titoli correlati: se scattano più ordini è quasi un unico trade. Massimo 2.")
+        if s["macro"] and prep:
+            warn.append("Dato UK stamattina (BoE, inflazione, PIL)? Allora niente trade.")
+        testo = "\n".join(righe) + "\n\n🎯 <b>Ordini da preparare</b>\n"
+        testo += ("\n\n".join(prep) + f"\n\n{scad}\nSe scatta un Buy Stop, il segnale dopo non va preso.") if prep else "Nessuno oggi."
         messaggi.append(testo)
+        if warn:
+            messaggi.append(avvertenze(f"Avvertenze {s['nome']}", warn))
 
-    # ---- 2. segnali ----
+    # ---- 2. segnali: ordine secco, avvertenze in un secondo messaggio ----
     tetto = cfg["saldo_eur"] * cfg["tetto_giornaliero_pct"] / 100
     for i in analisi:
         sim, barra = i["sim"], i.get("segnale")
         if i["anomalo"] or not barra or f"{i['k']}:segnale" in st["inviati"]:
             continue
         st["inviati"].append(f"{i['k']}:segnale")
-        quando = ora_it(barra["t"] + BAR)
+        nome = esc(sim["nome"])
         try:
             p, motivo = piano(barra["c"], i["hi"], i["lo"], sim, cfg, cambio(i))
         except Exception as e:
             p, motivo = None, f"cambio non disponibile ({esc(e)})"
+        registro = dict(sessione=chiave, k=i["k"], nome=sim["nome"], t=barra["t"], c=barra["c"],
+                        hi=i["hi"], lo=i["lo"], scaduto=True)
         if not p:
-            messaggi.append(f"⚪ {esc(sim['nome'])} ({s['nome']}): segnale alle {quando} ma <b>NIENTE TRADE</b>: {motivo}.")
-            st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], scaduto=True))
+            messaggi.append(f"⚪ <b>{nome}</b>: segnale ma <b>NIENTE TRADE</b> ({motivo}).")
+            registro["motivo"] = motivo
+            st["segnali"].append(registro)
             continue
+        registro.update(piano=p)
         ritardo = (adesso - (barra["t"] + BAR)) // 60
         scaduto = ritardo >= cfg.get("ritardo_max_min", 15) or adesso > fine
         pz = i["prezzo"] or barra["c"]
+        warn = []
         if pz < i["hi"]:
-            tipo, livello = "BUY LIMIT", None
-        elif pz > p["entrata"] + 0.3 * p["rischio_u"]:
-            tipo, livello = "BUY LIMIT", p["entrata"]
-        else:
-            tipo, livello = "BUY", p["entrata"]
-        unita = sim.get("unita", "lotti")
-        testo = []
+            messaggi.append(f"⚪ <b>{nome}</b>: segnale, ma il prezzo ({num(pz)}) è già tornato nel range. "
+                            f"<b>NESSUN ORDINE</b>.")
+            registro["motivo"] = "tornato nel range"
+            st["segnali"].append(registro)
+            continue
         if scaduto:
-            testo.append(f"⏱ <b>SEGNALE SCADUTO</b> ({ritardo} min dopo la candela): NON entrare, è solo per il registro.\n")
-        testo.append(f"🟢 <b>{esc(sim['nome'])}</b> — {s['nome']}")
-        if pz < i["hi"]:
-            scaduto = True  # non si prende: non conta nel tetto
-            testo.append(f"<b>NESSUN ORDINE</b>: il prezzo ({num(pz)}) è già tornato dentro il range, falso "
-                         f"breakout probabile. Se il Buy Stop è scattato, tieni SL {num(p['stop'])} e TP "
-                         f"{num(p['target'])}.")
+            messaggi.append(f"⏱ <b>{nome}</b>: segnale <b>SCADUTO</b> ({ritardo} min dopo la candela). "
+                            f"Non entrare.")
+            registro["motivo"] = f"scaduto ({ritardo} min)"
+            st["segnali"].append(registro)
+            continue
+        if pz > p["entrata"] + 0.3 * p["rischio_u"]:
+            tipo = "BUY LIMIT"
+            warn.append(f"Il prezzo è già a {num(pz)}: ordine limite al livello del segnale, non inseguirlo.")
         else:
-            testo += righe_ordine(tipo, livello, p, unita)
-        testo.append("")
-        testo.append(f"Rischio ≈ {num(p['rischio_eur'])} € · scadenza {ora_it(fine)} · chiudi a mano entro le "
-                     f"{ora_it(chiusura)}")
-        testo.append(f"Perché: la candela delle {ora_it(barra['t'])} ha chiuso a {num(barra['c'])}, sopra il massimo "
-                     f"del range ({num(i['lo'])} – {num(i['hi'])}). Stop a {p['regola']}, target {num(p['R'], 1)}R.")
-        if tipo == "BUY LIMIT" and livello and not scaduto:
-            testo.append(f"Il prezzo è già salito a {num(pz)}: invece di inseguirlo, metti un ordine limite a "
-                         f"{num(livello)} (il prezzo del segnale), valido fino alle {ora_it(fine)}.")
-        testo.append("Se il Buy Stop del messaggio del range è già scattato, non aprire un'altra posizione: tieni "
-                     "SL e TP di quel messaggio.")
-        if i["valuta"] in ("GBp", "GBX"):
-            testo.append("Prezzi in pence (GBX): 600 = 6,00 £.")
-        if not scaduto and 7 <= ritardo:
-            testo.append(f"⚠️ Arrivato {ritardo} min dopo la candela: controlla il prezzo su MT5 prima di entrare.")
+            tipo = "BUY"
+        if ritardo >= 7:
+            warn.append(f"Arrivato {ritardo} min dopo la candela: controlla il prezzo su MT5.")
         mancano = (chiusura - adesso) // 60
-        if not scaduto and mancano < 90:
-            testo.append(f"⚠️ Mancano {mancano} min alla chiusura delle {ora_it(chiusura)}: il TP difficilmente si "
-                         f"raggiunge, valuta se entrare.")
+        if mancano < 90:
+            warn.append(f"Mancano {mancano} min alla chiusura: il TP difficilmente si raggiunge.")
         stessi = [x["nome"] for x in st["segnali"] if x["sessione"] == chiave and not x.get("scaduto")]
-        if stessi and not scaduto:
-            testo.append("⚠️ Correlazione: oggi c'è già un segnale su " + esc(", ".join(stessi))
-                         + ". Prenderli tutti è quasi un unico trade più grosso.")
-        if not scaduto:
-            if st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
-                testo.insert(0, f"⛔ <b>TETTO GIORNALIERO</b>: con questo il rischio di oggi supererebbe "
-                                f"{num(tetto)} €. Questo NON si prende.\n")
-            else:
-                st["rischio_eur"] += p["rischio_eur"]
-        st["segnali"].append(dict(sessione=chiave, nome=sim["nome"], scaduto=scaduto))
-        testo.append("Verifica i livelli su MT5 (Yahoo può differire dal CFD). Nessun ordine piazzato.")
-        messaggi.append("\n".join(testo))
+        if stessi:
+            warn.append("Correlato con " + esc(", ".join(stessi)) + ": prenderli tutti è quasi un unico trade.")
+        testa = f"🟢 <b>{nome}</b>"
+        if st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
+            testa = f"⛔ <b>{nome}</b>: TETTO GIORNALIERO superato, NON si prende"
+            registro["motivo"] = "tetto giornaliero"
+        else:
+            st["rischio_eur"] += p["rischio_eur"]
+            registro["scaduto"] = False
+        messaggi.append(f"{testa}\n" + ordine(tipo, p["entrata"], p, sim.get("unita", "lotti")) + f"\n{scad}")
+        if warn:
+            messaggi.append(avvertenze(f"Avvertenze {nome}", warn))
+        st["segnali"].append(registro)
 
     # ---- 3. a metà sessione: com'è la situazione ----
     if meta <= adesso < fine and f"{chiave}:meta" not in st["inviati"] and analisi:
         st["inviati"].append(f"{chiave}:meta")
-        righe = [f"🕐 <b>Metà sessione {s['nome']}</b> ({ora_it(adesso)}) · entrate fino alle {ora_it(fine)}, "
-                 f"chiusura {ora_it(chiusura)}"]
+        righe = [f"🕐 <b>Metà sessione {s['nome']}</b> · entrate fino alle {ora_it(fine)}"]
         for i in analisi:
-            sim, nome = i["sim"], esc(i["sim"]["nome"])
-            pz = i["prezzo"]
+            nome, pz = esc(i["sim"]["nome"]), i["prezzo"]
+            reg = next((x for x in st["segnali"] if x.get("k") == i["k"]), None)
             if i["anomalo"]:
-                righe.append(f"• {nome}: escluso oggi (range anomalo).")
-                continue
-            barra = i.get("segnale")
-            if barra:
-                try:
-                    p, motivo = piano(barra["c"], i["hi"], i["lo"], sim, cfg, cambio(i))
-                except Exception:
-                    p, motivo = None, "cambio non disponibile"
-                if not p:
-                    righe.append(f"• {nome}: segnale alle {ora_it(barra['t'] + BAR)}, ma niente trade ({motivo}).")
-                    continue
-                stato, r = esito_dopo(i, barra, p)
+                righe.append(f"⛔ {nome}: escluso")
+            elif reg and reg.get("piano"):
+                stato, r = esito(i["bs"], reg["t"], reg["piano"], pz)
                 if stato == "tp":
-                    righe.append(f"• {nome}: ✅ segnale delle {ora_it(barra['t'] + BAR)} arrivato al <b>TP</b> "
-                                 f"{num(p['target'])} (+{num(p['R'], 1)}R).")
+                    righe.append(f"✅ {nome}: TP preso (+{num(reg['piano']['R'], 1)}R)")
                 elif stato == "sl":
-                    righe.append(f"• {nome}: 🔻 segnale delle {ora_it(barra['t'] + BAR)} chiuso allo <b>SL</b> "
-                                 f"{num(p['stop'])} (−1R). Niente altri trade oggi su questo.")
+                    righe.append(f"🔻 {nome}: SL preso (−1R)")
                 else:
-                    righe.append(f"• {nome}: 🟢 in posizione dal segnale delle {ora_it(barra['t'] + BAR)}: ora "
-                                 f"{num(pz)}, <b>{'+' if r >= 0 else ''}{num(r, 1)}R</b> "
-                                 f"(SL {num(p['stop'])} · TP {num(p['target'])}).")
-                continue
-            if pz is None:
-                righe.append(f"• {nome}: nessun segnale, prezzo non disponibile.")
-            elif pz > i["hi"]:
-                righe.append(f"• {nome}: ⏳ ora {num(pz)}, sopra il massimo {num(i['hi'])} ma senza ancora una candela "
-                             f"chiusa sopra: il segnale può arrivare a breve.")
-            elif pz >= i["lo"]:
-                dist = i["hi"] - pz
-                righe.append(f"• {nome}: ⏳ in attesa: ora {num(pz)}, mancano {num(dist)} "
-                             f"({num(dist / pz * 100, 2)}%) al massimo {num(i['hi'])}. Il Buy Stop "
-                             f"{num(ordine_pendente(i['hi'], pz, sim))} resta valido fino alle {ora_it(fine)}.")
-            else:
-                righe.append(f"• {nome}: ⬇️ ora {num(pz)}, sotto il range: un segnale long è poco probabile. "
-                             f"Se hai il Buy Stop puoi lasciarlo fino alle {ora_it(fine)}.")
-        rischio = st["rischio_eur"]
-        righe.append(f"\nRischio usato oggi: {num(rischio)} € su {num(tetto)} €.")
+                    righe.append(f"🟢 {nome}: aperto, {'+' if r >= 0 else ''}{num(r, 1)}R")
+            elif reg:
+                righe.append(f"⚪ {nome}: segnale senza trade")
+            elif pz is not None and pz >= i["lo"]:
+                righe.append(f"⏳ {nome}: in attesa, mancano {num(max(i['hi'] - pz, 0))} al massimo")
+            elif pz is not None:
+                righe.append(f"⬇️ {nome}: sotto il range")
+        righe.append(f"Rischio usato: {num(st['rischio_eur'])} € su {num(tetto)} €")
         messaggi.append("\n".join(righe))
 
-    # ---- 4. fine finestra e chiusura ----
+    # ---- 4. fine finestra entrate ----
     senza = [esc(i["sim"]["nome"]) for i in analisi if not i["anomalo"] and not i.get("segnale")]
     if adesso >= fine and senza and f"{chiave}:fine" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:fine")
-        messaggi.append(f"⏹ {s['nome']}: nessun segnale entro le {ora_it(fine)} su " + ", ".join(senza)
-                        + ". Cancella i Buy Stop non scattati.")
+        messaggi.append(f"⏹ {s['nome']}: nessun segnale su " + ", ".join(senza) + ". Cancella i Buy Stop.")
+
+    # ---- 5. chiusura: azione + riepilogo con le spiegazioni ----
     if adesso >= chiusura and f"{chiave}:chiudi" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:chiudi")
-        if any(x["sessione"] == chiave and not x.get("scaduto") for x in st["segnali"]):
-            messaggi.append(f"⏰ {s['nome']}: sono le {ora_it(chiusura)}. Chiudi a mano le posizioni aperte "
-                            f"(MT5 non lo fa da solo). Poi scrivimi il risultato, es. +17,80 o -9,10.")
+        aperti = [x for x in st["segnali"] if x["sessione"] == chiave and not x.get("scaduto")]
+        if aperti:
+            messaggi.append(f"⏰ <b>{s['nome']}: chiudi a mano le posizioni aperte.</b>\n"
+                            f"Poi scrivimi il risultato, es. +17,80 o -9,10.")
+        righe = [f"📋 <b>Riepilogo {s['nome']}</b>"]
+        for i in analisi:
+            nome = esc(i["sim"]["nome"])
+            righe.append(f"\n<b>{nome}</b> · range {num(i['lo'])} – {num(i['hi'])}"
+                         + (f" ({num(i['rapporto'] * 100, 0)}% del solito)" if i["rapporto"] else ""))
+            reg = next((x for x in st["segnali"] if x.get("k") == i["k"]), None)
+            if i["anomalo"]:
+                righe.append("Escluso: range anomalo rispetto agli ultimi giorni.")
+            elif not reg:
+                massimo = max((x["h"] for x in i["bs"] if x["t"] >= ap + 3 * BAR), default=None)
+                righe.append("Nessuna candela ha chiuso sopra il massimo"
+                             + (f" (il prezzo è arrivato al massimo a {num(massimo)})." if massimo else "."))
+            else:
+                righe.append(f"Segnale: la candela delle {ora_it(reg['t'])} ha chiuso a {num(reg['c'])}, sopra il "
+                             f"massimo {num(reg['hi'])}.")
+                if reg.get("piano"):
+                    p = reg["piano"]
+                    righe.append(f"Stop a {p['regola']} ({num(p['stop'])}), target {num(p['R'], 1)}R ({num(p['target'])}).")
+                    stato, r = esito(i["bs"], reg["t"], p, i["prezzo"])
+                    euro = r * p["rischio_eur"]
+                    if stato == "tp":
+                        righe.append(f"Esito: ✅ TP preso, +{num(r, 1)}R (≈ +{num(euro)} €).")
+                    elif stato == "sl":
+                        righe.append(f"Esito: 🔻 SL preso, −1R (≈ {num(euro)} €).")
+                    else:
+                        righe.append(f"Esito alla chiusura: {'+' if r >= 0 else ''}{num(r, 1)}R "
+                                     f"(≈ {'+' if euro >= 0 else ''}{num(euro)} €).")
+                if reg.get("motivo"):
+                    righe.append(f"Non preso: {esc(reg['motivo'])}.")
+        righe.append("\nEsiti calcolati sui dati Yahoo: il tuo risultato vero è quello di MT5.")
+        messaggi.append("\n".join(righe))
 
 
 def main():

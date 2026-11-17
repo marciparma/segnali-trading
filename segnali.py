@@ -179,12 +179,23 @@ def piano(entrata, hi, lo, sim, cfg, cambio):
     rischio_max = cfg["saldo_eur"] * cfg["rischio_pct"] / 100
     eur_per_unita = rischio_u * cambio * sim.get("valore_punto", 1.0)
     step = sim.get("step", 1)
-    qta = math.floor(rischio_max / eur_per_unita / step + 1e-9) * step
+    esatta = rischio_max / eur_per_unita
+    qta = math.floor(esatta / step + 1e-9) * step
     minimo = sim.get("minimo", step)
     if qta < minimo:
         return None, (f"anche la quantità minima ({num(minimo, 0 if minimo >= 1 else 2)}) rischierebbe "
                       f"{num(minimo * eur_per_unita)} €, oltre il tuo massimo di {num(rischio_max)} €")
-    dec = 0 if step >= 1 else len(str(step).split(".")[1])
+    # lotti "puliti": interi da 1 in su, a decimi sotto 1. Arrotonda al più vicino,
+    # ma se così il rischio supera l'1% di oltre il 10% arrotonda per difetto
+    if step < 1:
+        grano = 1.0 if esatta >= 1 else 0.1
+        tondo = round(esatta / grano) * grano
+        if tondo * eur_per_unita > rischio_max * 1.10:
+            tondo = math.floor(esatta / grano + 1e-9) * grano
+        if tondo >= minimo and tondo > 0:
+            qta = tondo
+    dec = 0 if qta == int(qta) else (1 if abs(qta * 10 - round(qta * 10)) < 1e-9 else
+                                      len(str(step).split(".")[1]))
     return dict(entrata=entrata, stop=stop, regola=regola, target=target, R=R, rischio_u=rischio_u,
                 qta=round(qta, dec), dec=dec, rischio_eur=qta * eur_per_unita), None
 

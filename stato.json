@@ -5,7 +5,11 @@
   "londra:BP.L:range",
   "londra:meta",
   "londra:BP.L:segnale",
-  "londra:fine"
+  "londra:fine",
+  "usa:TSLA:range",
+  "usa:NVDA:range",
+  "usa:AAPL:range",
+  "usa:AMD:range"
  ],
  "rischio_eur": 10.038149533669545,
  "segnali": [

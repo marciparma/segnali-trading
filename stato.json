@@ -3,8 +3,31 @@
  "inviati": [
   "londra:^FTSE:range",
   "londra:BP.L:range",
-  "londra:meta"
+  "londra:meta",
+  "londra:BP.L:segnale"
  ],
- "rischio_eur": 0.0,
- "segnali": []
+ "rischio_eur": 10.038149533669545,
+ "segnali": [
+  {
+   "sessione": "londra",
+   "k": "londra:BP.L",
+   "nome": "BP",
+   "t": 1794906300,
+   "c": 568.5999755859375,
+   "hi": 568.2999877929688,
+   "lo": 564.4000244140625,
+   "scaduto": false,
+   "piano": {
+    "entrata": 568.5999755859375,
+    "stop": 566.35,
+    "regola": "metà range",
+    "target": 573.1,
+    "R": 2.0,
+    "rischio_u": 2.2499755859374773,
+    "qta": 3.72,
+    "dec": 2,
+    "rischio_eur": 10.038149533669545
+   }
+  }
+ ]
 }

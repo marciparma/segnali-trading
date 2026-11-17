@@ -9,9 +9,10 @@
   "usa:TSLA:range",
   "usa:NVDA:range",
   "usa:AAPL:range",
-  "usa:AMD:range"
+  "usa:AMD:range",
+  "usa:AAPL:segnale"
  ],
- "rischio_eur": 10.038149533669545,
+ "rischio_eur": 19.179596529994903,
  "segnali": [
   {
    "sessione": "londra",
@@ -32,6 +33,27 @@
     "qta": 3.72,
     "dec": 2,
     "rischio_eur": 10.038149533669545
+   }
+  },
+  {
+   "sessione": "usa",
+   "k": "usa:AAPL",
+   "nome": "Apple (AAPL)",
+   "t": 1794927000,
+   "c": 354.67999267578125,
+   "hi": 353.5498962402344,
+   "lo": 351.80999755859375,
+   "scaduto": false,
+   "piano": {
+    "entrata": 354.67999267578125,
+    "stop": 352.67,
+    "regola": "metà range",
+    "target": 358.7,
+    "R": 2.0,
+    "rischio_u": 2.009992675781234,
+    "qta": 5,
+    "dec": 0,
+    "rischio_eur": 9.141446996325357
    }
   }
  ]

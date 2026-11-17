@@ -1,26 +1,6 @@
 {
- "data": "2026-11-16",
- "inviati": [
-  "londra:^FTSE:range",
-  "londra:BP.L:range",
-  "londra:meta",
-  "londra:^FTSE:segnale",
-  "londra:fine",
-  "usa:TSLA:range",
-  "usa:NVDA:range",
-  "usa:AAPL:range",
-  "usa:AMD:range",
-  "londra:chiudi",
-  "usa:meta",
-  "usa:fine",
-  "usa:chiudi"
- ],
- "rischio_eur": 9.919301320177057,
- "segnali": [
-  {
-   "sessione": "londra",
-   "nome": "UK100.s (FTSE 100)",
-   "scaduto": false
-  }
- ]
+ "data": "2026-11-17",
+ "inviati": [],
+ "rischio_eur": 0.0,
+ "segnali": []
 }

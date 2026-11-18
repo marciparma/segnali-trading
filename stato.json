@@ -1,64 +1,6 @@
 {
- "data": "2026-11-17",
- "inviati": [
-  "londra:^FTSE:range",
-  "londra:BP.L:range",
-  "londra:meta",
-  "londra:BP.L:segnale",
-  "londra:fine",
-  "usa:TSLA:range",
-  "usa:NVDA:range",
-  "usa:AAPL:range",
-  "usa:AMD:range",
-  "usa:AAPL:segnale",
-  "londra:chiudi",
-  "usa:meta",
-  "usa:fine",
-  "usa:chiudi"
- ],
- "rischio_eur": 19.179596529994903,
- "segnali": [
-  {
-   "sessione": "londra",
-   "k": "londra:BP.L",
-   "nome": "BP",
-   "t": 1794906300,
-   "c": 568.5999755859375,
-   "hi": 568.2999877929688,
-   "lo": 564.4000244140625,
-   "scaduto": false,
-   "piano": {
-    "entrata": 568.5999755859375,
-    "stop": 566.35,
-    "regola": "metà range",
-    "target": 573.1,
-    "R": 2.0,
-    "rischio_u": 2.2499755859374773,
-    "qta": 3.72,
-    "dec": 2,
-    "rischio_eur": 10.038149533669545
-   }
-  },
-  {
-   "sessione": "usa",
-   "k": "usa:AAPL",
-   "nome": "Apple (AAPL)",
-   "t": 1794927000,
-   "c": 354.67999267578125,
-   "hi": 353.5498962402344,
-   "lo": 351.80999755859375,
-   "scaduto": false,
-   "piano": {
-    "entrata": 354.67999267578125,
-    "stop": 352.67,
-    "regola": "metà range",
-    "target": 358.7,
-    "R": 2.0,
-    "rischio_u": 2.009992675781234,
-    "qta": 5,
-    "dec": 0,
-    "rischio_eur": 9.141446996325357
-   }
-  }
- ]
+ "data": "2026-11-18",
+ "inviati": [],
+ "rischio_eur": 0.0,
+ "segnali": []
 }

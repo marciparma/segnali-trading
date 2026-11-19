@@ -4,7 +4,8 @@
   "londra:^FTSE:range",
   "londra:BP.L:range",
   "londra:meta",
-  "londra:BP.L:segnale"
+  "londra:BP.L:segnale",
+  "londra:BP.L:sg_esito"
  ],
  "rischio_eur": 9.850333311031019,
  "segnali": [

@@ -1,6 +1,6 @@
 {
- "saldo": 973.66,
- "offset": 112806336,
+ "saldo": 969.32,
+ "offset": 112806337,
  "movimenti": [
   {
    "data": "12/11 22:51",
@@ -25,6 +25,11 @@
   {
    "data": "19/11 10:40",
    "importo": -14.22,
+   "nota": "saldo impostato a mano"
+  },
+  {
+   "data": "19/11 21:35",
+   "importo": -4.34,
    "nota": "saldo impostato a mano"
   }
  ]

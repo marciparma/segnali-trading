@@ -5,7 +5,8 @@
   "londra:BP.L:range",
   "londra:meta",
   "londra:BP.L:segnale",
-  "londra:BP.L:sg_esito"
+  "londra:BP.L:sg_esito",
+  "londra:fine"
  ],
  "rischio_eur": 9.850333311031019,
  "segnali": [

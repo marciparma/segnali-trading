@@ -512,6 +512,41 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         if warn:
             messaggi.append(avvertenze(f"Avvertenze {s['nome']}", warn))
 
+    # ---- 2b. avvisi: Buy Stop scattato, SL o TP preso ----
+    unita_di = {}
+    for i in analisi:
+        nome, k, bs = esc(i["sim"]["nome"]), i["k"], i["bs"]
+        unita_di[k] = i["sim"].get("unita", "lotti")
+        da_seguire = []
+        o = st.get("ordini", {}).get(k)
+        if o:
+            t_bs = scatto_buy_stop(bs, ap, fine, o["livello"])
+            if t_bs:
+                if f"{k}:bs_scattato" not in st["inviati"]:
+                    st["inviati"].append(f"{k}:bs_scattato")
+                    messaggi.append(f"🔔 <b>{nome}</b>: Buy Stop scattato a {num(o['livello'])} ({ora_it(t_bs)}).\n"
+                                    f"Se l'avevi messo sei dentro con SL {num(o['piano']['stop'])} e TP {num(o['piano']['target'])}: "
+                                    f"non entrare di nuovo.\n"
+                                    f"Se non l'avevi messo, <b>NON comprare adesso a mercato</b>: aspetta il segnale.")
+                da_seguire.append(("Buy Stop", "bs", o["piano"], t_bs + BAR))
+        reg = next((x for x in st["segnali"] if x.get("k") == k), None)
+        if reg and reg.get("piano") and not reg.get("scaduto"):
+            da_seguire.append(("segnale", "sg", reg["piano"], reg["t"] + BAR))
+        for etichetta, sigla, p, da in da_seguire:
+            chiave_avviso = f"{k}:{sigla}_esito"
+            if chiave_avviso in st["inviati"]:
+                continue
+            stato, t = tocco(bs, da, chiusura, p)
+            if not stato:
+                continue
+            st["inviati"].append(chiave_avviso)
+            if stato == "tp":
+                messaggi.append(f"✅ <b>{nome}</b> ({etichetta}): <b>TP preso</b> a {num(p['target'])} ({ora_it(t)}) · "
+                                f"≈ +{num(p['R'] * p['rischio_eur'])} €. Scrivimi il risultato vero da MT5.")
+            else:
+                messaggi.append(f"🔻 <b>{nome}</b> ({etichetta}): <b>SL preso</b> a {num(p['stop'])} ({ora_it(t)}) · "
+                                f"≈ −{num(p['rischio_eur'])} €. Scrivimi il risultato vero da MT5.")
+
     # ---- 2. segnali: ordine secco, avvertenze in un secondo messaggio ----
     tetto = cfg["saldo_eur"] * cfg["tetto_giornaliero_pct"] / 100
     for i in analisi:
@@ -565,8 +600,14 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         o = st.get("ordini", {}).get(i["k"])
         t_bs = o and scatto_buy_stop(i["bs"], ap, fine, o["livello"])
         if t_bs and t_bs <= barra["t"] + BAR:
-            testa = (f"🟢 <b>{nome}</b>: il Buy Stop è già scattato alle {ora_it(t_bs)}.\n"
-                     f"Se l'avevi messo sei già dentro: <b>NON entrare di nuovo</b>.\nSe non l'avevi messo:")
+            chiuso, _ = tocco(i["bs"], t_bs + BAR, barra["t"] + BAR, o["piano"])
+            if chiuso:
+                testa = (f"🟢 <b>{nome}</b>: il Buy Stop è scattato alle {ora_it(t_bs)} e ha già preso "
+                         f"{'il TP' if chiuso == 'tp' else 'lo SL'}.\n"
+                         f"Se l'avevi messo, oggi su {nome} <b>hai finito</b>.\nSe non l'avevi messo:")
+            else:
+                testa = (f"🟢 <b>{nome}</b>: il Buy Stop è già scattato alle {ora_it(t_bs)}.\n"
+                         f"Se l'avevi messo sei già dentro: <b>NON entrare di nuovo</b>.\nSe non l'avevi messo:")
         if st["rischio_eur"] + p["rischio_eur"] > tetto + 1e-9:
             testa = f"⛔ <b>{nome}</b>: TETTO GIORNALIERO superato, NON si prende"
             registro["motivo"] = "tetto giornaliero"
@@ -578,40 +619,6 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
             messaggi.append(avvertenze(f"Avvertenze {nome}", warn))
         st["segnali"].append(registro)
 
-    # ---- 2b. avvisi: Buy Stop scattato, SL o TP preso ----
-    unita_di = {}
-    for i in analisi:
-        nome, k, bs = esc(i["sim"]["nome"]), i["k"], i["bs"]
-        unita_di[k] = i["sim"].get("unita", "lotti")
-        da_seguire = []
-        o = st.get("ordini", {}).get(k)
-        if o:
-            t_bs = scatto_buy_stop(bs, ap, fine, o["livello"])
-            if t_bs:
-                if f"{k}:bs_scattato" not in st["inviati"]:
-                    st["inviati"].append(f"{k}:bs_scattato")
-                    messaggi.append(f"🔔 <b>{nome}</b>: Buy Stop scattato a {num(o['livello'])} ({ora_it(t_bs)}).\n"
-                                    f"Sei dentro con SL {num(o['piano']['stop'])} e TP {num(o['piano']['target'])}. "
-                                    f"Non entrare di nuovo su {nome}.")
-                da_seguire.append(("Buy Stop", "bs", o["piano"], t_bs + BAR))
-        reg = next((x for x in st["segnali"] if x.get("k") == k), None)
-        if reg and reg.get("piano") and not reg.get("scaduto"):
-            da_seguire.append(("segnale", "sg", reg["piano"], reg["t"] + BAR))
-        for etichetta, sigla, p, da in da_seguire:
-            chiave_avviso = f"{k}:{sigla}_esito"
-            if chiave_avviso in st["inviati"]:
-                continue
-            stato, t = tocco(bs, da, chiusura, p)
-            if not stato:
-                continue
-            st["inviati"].append(chiave_avviso)
-            if stato == "tp":
-                messaggi.append(f"✅ <b>{nome}</b> ({etichetta}): <b>TP preso</b> a {num(p['target'])} ({ora_it(t)}) · "
-                                f"≈ +{num(p['R'] * p['rischio_eur'])} €. Scrivimi il risultato vero da MT5.")
-            else:
-                messaggi.append(f"🔻 <b>{nome}</b> ({etichetta}): <b>SL preso</b> a {num(p['stop'])} ({ora_it(t)}) · "
-                                f"≈ −{num(p['rischio_eur'])} €. Scrivimi il risultato vero da MT5.")
-
     # ---- 3. a metà sessione: com'è la situazione ----
     if meta <= adesso < fine and f"{chiave}:meta" not in st["inviati"] and analisi:
         st["inviati"].append(f"{chiave}:meta")
@@ -619,7 +626,15 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         for i in analisi:
             nome, pz = esc(i["sim"]["nome"]), i["prezzo"]
             reg = next((x for x in st["segnali"] if x.get("k") == i["k"]), None)
-            if i["anomalo"]:
+            o = st.get("ordini", {}).get(i["k"])
+            t_bs = o and scatto_buy_stop(i["bs"], ap, fine, o["livello"])
+            if t_bs and not (reg and reg.get("piano") and not reg.get("scaduto")):
+                stato, _ = tocco(i["bs"], t_bs + BAR, chiusura, o["piano"])
+                r = ((pz or o["livello"]) - o["livello"]) / o["piano"]["rischio_u"]
+                righe.append({"tp": f"✅ {nome}: Buy Stop, TP preso (+{num(o['piano']['R'], 1)}R)",
+                              "sl": f"🔻 {nome}: Buy Stop, SL preso (−1R)"}.get(
+                    stato, f"🟢 {nome}: Buy Stop aperto, {'+' if r >= 0 else ''}{num(r, 1)}R"))
+            elif i["anomalo"]:
                 righe.append(f"⛔ {nome}: escluso")
             elif reg and reg.get("piano"):
                 stato, r = esito(i["bs"], reg["t"], reg["piano"], pz)
@@ -639,7 +654,9 @@ def controlla_seduta(chiave, cfg, dati, st, adesso, messaggi):
         messaggi.append("\n".join(righe))
 
     # ---- 4. fine finestra entrate ----
-    senza = [esc(i["sim"]["nome"]) for i in analisi if not i["anomalo"] and not i.get("segnale")]
+    senza = [esc(i["sim"]["nome"]) for i in analisi if not i["anomalo"] and not i.get("segnale")
+             and not (st.get("ordini", {}).get(i["k"])
+                      and scatto_buy_stop(i["bs"], ap, fine, st["ordini"][i["k"]]["livello"]))]
     if adesso >= fine and senza and f"{chiave}:fine" not in st["inviati"]:
         st["inviati"].append(f"{chiave}:fine")
         messaggi.append(f"⏹ {s['nome']}: nessun segnale su " + ", ".join(senza) + ". Cancella i Buy Stop.")

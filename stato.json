@@ -6,7 +6,11 @@
   "londra:meta",
   "londra:BP.L:segnale",
   "londra:BP.L:sg_esito",
-  "londra:fine"
+  "londra:fine",
+  "usa:TSLA:range",
+  "usa:NVDA:range",
+  "usa:AAPL:range",
+  "usa:AMD:range"
  ],
  "rischio_eur": 9.850333311031019,
  "segnali": [
@@ -31,5 +35,49 @@
     "rischio_eur": 9.850333311031019
    }
   }
- ]
+ ],
+ "ordini": {
+  "usa:TSLA": {
+   "livello": 393.64,
+   "piano": {
+    "entrata": 393.64,
+    "stop": 390.95,
+    "regola": "metà range",
+    "target": 399.02,
+    "R": 2.0,
+    "rischio_u": 2.6899999999999977,
+    "qta": 3,
+    "dec": 0,
+    "rischio_eur": 7.3364366233220935
+   }
+  },
+  "usa:NVDA": {
+   "livello": 158.11,
+   "piano": {
+    "entrata": 158.11,
+    "stop": 155.32,
+    "regola": "metà range",
+    "target": 163.69,
+    "R": 2.0,
+    "rischio_u": 2.7900000000000205,
+    "qta": 3,
+    "dec": 0,
+    "rischio_eur": 7.60916660931926
+   }
+  },
+  "usa:AMD": {
+   "livello": 552.06,
+   "piano": {
+    "entrata": 552.06,
+    "stop": 544.54,
+    "regola": "metà range",
+    "target": 567.1,
+    "R": 2.0,
+    "rischio_u": 7.519999999999982,
+    "qta": 1,
+    "dec": 0,
+    "rischio_eur": 6.836431648994059
+   }
+  }
+ }
 }

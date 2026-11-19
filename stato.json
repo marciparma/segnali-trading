@@ -1,32 +1,6 @@
 {
- "data": "2026-11-18",
- "inviati": [
-  "londra:^FTSE:range",
-  "londra:BP.L:range",
-  "londra:meta",
-  "londra:fine",
-  "usa:TSLA:range",
-  "usa:NVDA:range",
-  "usa:AAPL:range",
-  "usa:AMD:range",
-  "londra:chiudi",
-  "usa:AMD:segnale",
-  "usa:meta",
-  "usa:fine",
-  "usa:chiudi"
- ],
+ "data": "2026-11-19",
+ "inviati": [],
  "rischio_eur": 0.0,
- "segnali": [
-  {
-   "sessione": "usa",
-   "k": "usa:AMD",
-   "nome": "AMD",
-   "t": 1795022700,
-   "c": 521.1950073242188,
-   "hi": 519.7999877929688,
-   "lo": 496.0,
-   "scaduto": true,
-   "motivo": "anche la quantità minima (1) rischierebbe 12,12 €, oltre il tuo massimo di 10,10 €"
-  }
- ]
+ "segnali": []
 }

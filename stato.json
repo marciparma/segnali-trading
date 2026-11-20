@@ -3,7 +3,8 @@
  "inviati": [
   "londra:^FTSE:range",
   "londra:BP.L:range",
-  "londra:meta"
+  "londra:meta",
+  "londra:fine"
  ],
  "rischio_eur": 0.0,
  "segnali": [],

@@ -12,7 +12,9 @@
   "usa:TSLA:bs_scattato",
   "usa:TSLA:segnale",
   "usa:AMD:bs_scattato",
-  "usa:AMD:bs_esito"
+  "usa:AMD:bs_esito",
+  "usa:TSLA:bs_esito",
+  "usa:TSLA:sg_esito"
  ],
  "rischio_eur": 6.607316873015522,
  "segnali": [

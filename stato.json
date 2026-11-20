@@ -9,10 +9,33 @@
   "usa:NVDA:range",
   "usa:AAPL:range",
   "usa:AMD:range",
-  "usa:TSLA:bs_scattato"
+  "usa:TSLA:bs_scattato",
+  "usa:TSLA:segnale"
  ],
- "rischio_eur": 0.0,
- "segnali": [],
+ "rischio_eur": 6.607316873015522,
+ "segnali": [
+  {
+   "sessione": "usa",
+   "k": "usa:TSLA",
+   "nome": "Tesla (TSLA)",
+   "t": 1795186200,
+   "c": 371.3699951171875,
+   "hi": 370.3399963378906,
+   "lo": 365.1400146484375,
+   "scaduto": false,
+   "piano": {
+    "entrata": 371.3699951171875,
+    "stop": 367.74,
+    "regola": "metà range",
+    "target": 378.63,
+    "R": 2.0,
+    "rischio_u": 3.629995117187491,
+    "qta": 2,
+    "dec": 0,
+    "rischio_eur": 6.607316873015522
+   }
+  }
+ ],
  "ordini": {
   "londra:^FTSE": {
    "livello": 10453.81,

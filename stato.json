@@ -1,6 +1,39 @@
 {
  "data": "2026-11-20",
- "inviati": [],
+ "inviati": [
+  "londra:^FTSE:range",
+  "londra:BP.L:range"
+ ],
  "rischio_eur": 0.0,
- "segnali": []
+ "segnali": [],
+ "ordini": {
+  "londra:^FTSE": {
+   "livello": 10453.81,
+   "piano": {
+    "entrata": 10453.81,
+    "stop": 10421.32,
+    "regola": "metà range",
+    "target": 10518.79,
+    "R": 2.0,
+    "rischio_u": 32.48999999999978,
+    "qta": 0.2,
+    "dec": 1,
+    "rischio_eur": 7.7631626706281525
+   }
+  },
+  "londra:BP.L": {
+   "livello": 551.16,
+   "piano": {
+    "entrata": 551.16,
+    "stop": 549.69,
+    "regola": "metà range",
+    "target": 554.1,
+    "R": 2.0,
+    "rischio_u": 1.4699999999999136,
+    "qta": 6.0,
+    "dec": 0,
+    "rischio_eur": 10.537256810547358
+   }
+  }
+ }
 }

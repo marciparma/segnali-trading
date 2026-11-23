@@ -4,9 +4,11 @@
   "londra:^FTSE:range",
   "londra:BP.L:range",
   "londra:BP.L:bs_scattato",
-  "londra:BP.L:segnale"
+  "londra:BP.L:segnale",
+  "londra:^FTSE:bs_scattato",
+  "londra:^FTSE:segnale"
  ],
- "rischio_eur": 0.0,
+ "rischio_eur": 8.017526009890931,
  "segnali": [
   {
    "sessione": "londra",
@@ -29,6 +31,27 @@
     "rischio_eur": 10.392490562152663
    },
    "motivo": "tornato nel range"
+  },
+  {
+   "sessione": "londra",
+   "k": "londra:^FTSE",
+   "nome": "UK100.s (FTSE 100)",
+   "t": 1795422000,
+   "c": 10379.740234375,
+   "hi": 10373.6904296875,
+   "lo": 10341.0498046875,
+   "scaduto": false,
+   "piano": {
+    "entrata": 10379.740234375,
+    "stop": 10357.37,
+    "regola": "metà range",
+    "target": 10424.48,
+    "R": 2.0,
+    "rischio_u": 22.3702343749992,
+    "qta": 0.3,
+    "dec": 1,
+    "rischio_eur": 8.017526009890931
+   }
   }
  ],
  "ordini": {

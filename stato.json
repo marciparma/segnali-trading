@@ -19,7 +19,9 @@
   "usa:NVDA:segnale",
   "usa:AAPL:bs_scattato",
   "usa:AAPL:segnale",
-  "londra:chiudi"
+  "londra:chiudi",
+  "usa:AAPL:bs_esito",
+  "usa:AAPL:sg_esito"
  ],
  "rischio_eur": 24.860805060713837,
  "segnali": [

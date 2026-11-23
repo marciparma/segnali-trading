@@ -9,7 +9,8 @@
   "londra:^FTSE:segnale",
   "londra:BP.L:bs_esito",
   "londra:meta",
-  "londra:^FTSE:bs_esito"
+  "londra:^FTSE:bs_esito",
+  "londra:^FTSE:sg_esito"
  ],
  "rischio_eur": 8.017526009890931,
  "segnali": [

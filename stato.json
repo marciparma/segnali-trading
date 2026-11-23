@@ -10,7 +10,11 @@
   "londra:BP.L:bs_esito",
   "londra:meta",
   "londra:^FTSE:bs_esito",
-  "londra:^FTSE:sg_esito"
+  "londra:^FTSE:sg_esito",
+  "usa:TSLA:range",
+  "usa:NVDA:range",
+  "usa:AAPL:range",
+  "usa:AMD:range"
  ],
  "rischio_eur": 8.017526009890931,
  "segnali": [
@@ -85,6 +89,34 @@
     "qta": 6.0,
     "dec": 0,
     "rischio_eur": 9.38574688296941
+   }
+  },
+  "usa:NVDA": {
+   "livello": 164.82,
+   "piano": {
+    "entrata": 164.82,
+    "stop": 160.86,
+    "regola": "metà range",
+    "target": 172.74,
+    "R": 2.0,
+    "rischio_u": 3.9599999999999795,
+    "qta": 2,
+    "dec": 0,
+    "rischio_eur": 7.241256506885708
+   }
+  },
+  "usa:AAPL": {
+   "livello": 349.79,
+   "piano": {
+    "entrata": 349.79,
+    "stop": 347.6,
+    "regola": "metà range",
+    "target": 354.17,
+    "R": 2.0,
+    "rischio_u": 2.1899999999999977,
+    "qta": 4,
+    "dec": 0,
+    "rischio_eur": 8.009268560646348
    }
   }
  }

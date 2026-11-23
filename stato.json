@@ -14,7 +14,8 @@
   "usa:TSLA:range",
   "usa:NVDA:range",
   "usa:AAPL:range",
-  "usa:AMD:range"
+  "usa:AMD:range",
+  "usa:NVDA:bs_scattato"
  ],
  "rischio_eur": 8.017526009890931,
  "segnali": [

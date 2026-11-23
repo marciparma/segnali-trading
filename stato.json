@@ -15,9 +15,10 @@
   "usa:NVDA:range",
   "usa:AAPL:range",
   "usa:AMD:range",
-  "usa:NVDA:bs_scattato"
+  "usa:NVDA:bs_scattato",
+  "usa:NVDA:segnale"
  ],
- "rischio_eur": 8.017526009890931,
+ "rischio_eur": 15.499765972555359,
  "segnali": [
   {
    "sessione": "londra",
@@ -60,6 +61,27 @@
     "qta": 0.3,
     "dec": 1,
     "rischio_eur": 8.017526009890931
+   }
+  },
+  {
+   "sessione": "usa",
+   "k": "usa:NVDA",
+   "nome": "Nvidia (NVIDIA)",
+   "t": 1795445400,
+   "c": 164.9499969482422,
+   "hi": 164.8000030517578,
+   "lo": 156.92999267578125,
+   "scaduto": false,
+   "piano": {
+    "entrata": 164.9499969482422,
+    "stop": 160.86,
+    "regola": "metà range",
+    "target": 173.13,
+    "R": 2.0,
+    "rischio_u": 4.089996948242174,
+    "qta": 2,
+    "dec": 0,
+    "rischio_eur": 7.482239962664429
    }
   }
  ],

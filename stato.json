@@ -21,7 +21,8 @@
   "usa:AAPL:segnale",
   "londra:chiudi",
   "usa:AAPL:bs_esito",
-  "usa:AAPL:sg_esito"
+  "usa:AAPL:sg_esito",
+  "usa:meta"
  ],
  "rischio_eur": 24.860805060713837,
  "segnali": [

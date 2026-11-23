@@ -2,10 +2,35 @@
  "data": "2026-11-23",
  "inviati": [
   "londra:^FTSE:range",
-  "londra:BP.L:range"
+  "londra:BP.L:range",
+  "londra:BP.L:bs_scattato",
+  "londra:BP.L:segnale"
  ],
  "rischio_eur": 0.0,
- "segnali": [],
+ "segnali": [
+  {
+   "sessione": "londra",
+   "k": "londra:BP.L",
+   "nome": "BP",
+   "t": 1795421700,
+   "c": 550.7000122070312,
+   "hi": 550.5,
+   "lo": 548.0,
+   "scaduto": true,
+   "piano": {
+    "entrata": 550.7000122070312,
+    "stop": 549.25,
+    "regola": "metà range",
+    "target": 553.6,
+    "R": 2.0,
+    "rischio_u": 1.45001220703125,
+    "qta": 6.0,
+    "dec": 0,
+    "rischio_eur": 10.392490562152663
+   },
+   "motivo": "tornato nel range"
+  }
+ ],
  "ordini": {
   "londra:^FTSE": {
    "livello": 10374.73,
